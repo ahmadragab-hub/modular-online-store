@@ -5,6 +5,7 @@ namespace App\Domains\Orders\Models;
 use App\Domains\Customers\Models\Customer;
 use App\Domains\Identity\Models\User;
 use App\Domains\Inventory\Models\InventoryReservation;
+use App\Domains\Payments\Models\Payment;
 use App\Domains\Store\Models\Currency;
 use App\Domains\Store\Models\CurrencyExchangeRate;
 use App\Domains\Store\Models\StoreLocale;
@@ -149,6 +150,14 @@ class Order extends Model
     public function reservations(): HasMany
     {
         return $this->hasMany(InventoryReservation::class);
+    }
+
+    /**
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     /**
