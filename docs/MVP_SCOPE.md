@@ -53,7 +53,7 @@ Prioritization for the **first usable** single-store fashion release. Schema in 
 
 ### Checkout & orders
 
-- [ ] `PlaceOrderAction` (Strategy C — see [BUSINESS_WORKFLOWS.md](BUSINESS_WORKFLOWS.md))
+- [x] `PlaceOrderAction` (Strategy C — see [BUSINESS_WORKFLOWS.md](BUSINESS_WORKFLOWS.md))
 - [ ] `orders.idempotency_key`, `orders.public_uuid` (no `checkout_sessions` table)
 - [ ] Orders with immutable snapshots + frozen FX and transaction currency
 - [ ] `order_status_histories` including `payment_failed`

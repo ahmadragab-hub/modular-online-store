@@ -132,16 +132,27 @@ Laravel infrastructure tables (`jobs`, `cache`, `failed_jobs`) are framework-own
 
 ### Inventory
 
-**Owns:** `quantity_on_hand`, reservations, movement audit.
+**Owns:** `quantity_on_hand`, reservations, movement audit, and all reservation lifecycle invariants. **Checkout** coordinates when to call Inventory Actions; it does **not** own stock or reservation rules.
 
 **Integration key:** `product_variant_id` (and `sku` for logging only).
 
 **Operations:**
 
 - `AdjustStockAction` (admin).
-- `ReserveStockAction`, `ReleaseReservationAction`, `CommitReservationAction` (checkout).
+- `ReserveStockAction`, `ReleaseReservationAction`, `CommitReservationAction` (invoked from checkout/payment workflows).
 - `ExpireReservationsJob` (scheduled).
 - `GetAvailableQuantityQuery`.
+
+**Reservation lifecycle (MVP, owned by Inventory):**
+
+| Event | `ReleaseReservationAction`? | Notes |
+| --- | --- | --- |
+| Place order | No (hold) | `ReserveStockAction`; reservation `active` with TTL |
+| Payment captured (verified) | No | `CommitReservationAction` |
+| Payment declined / `payment_failed` | **No** | Reservation stays **active**; same order may retry payment while active |
+| Order **cancelled** (customer/admin) | **Yes** | Release active reservations for that order |
+| Reservation **TTL expired** | **Yes** | `ExpireReservationsJob`; typically cancels stale order |
+| Late payment success after expiry | **No** auto-commit | Order already cancelled and stock released; **reconciliation** only—do not confirm order or commit stock ([BUSINESS_WORKFLOWS.md](BUSINESS_WORKFLOWS.md)) |
 
 **Concurrency:** `ReserveStockAction` uses `DB::transaction()` + `SELECT ... FOR UPDATE` on `inventory_levels` for the variant (recommended MVP). Alternative: optimistic locking via `version` column with retry.
 
@@ -150,8 +161,8 @@ Laravel infrastructure tables (`jobs`, `cache`, `failed_jobs`) are framework-own
 | Caller | Callee | Mechanism |
 | --- | --- | --- |
 | Checkout | Inventory | `ReserveStockAction` → returns reservation ids |
-| Checkout | Inventory | `CommitReservationAction` after confirmed payment |
-| Checkout | Inventory | `ReleaseReservationAction` on payment failure / cancel |
+| Checkout / Payments (success path) | Inventory | `CommitReservationAction` after verified payment |
+| Checkout / Orders (cancel) or Inventory (job) | Inventory | `ReleaseReservationAction` on **order cancellation** or **reservation expiry**—not on ordinary payment failure |
 | Admin | Inventory | `AdjustStockAction` |
 | Catalog admin | Inventory | Event `VariantCreated` → listener `InitializeVariantStockAction` **or** explicit admin “add stock” step |
 

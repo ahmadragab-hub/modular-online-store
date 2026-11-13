@@ -38,7 +38,7 @@ End-to-end flows for the fashion store MVP, including **transaction boundaries**
 | --- | --- | --- | --- |
 | **A. Pay then reserve** | Payment → create order → reserve stock | Simple mental model | Oversell risk if payment succeeds under concurrency |
 | **B. Order then pay (no reserve)** | Create order → payment → deduct stock on success | Fewer reservation tables | Race on last units during payment redirect |
-| **C. Reserve → pending order → pay → commit** | Hold stock → create `pending_payment` order → payment → commit | Strong oversell protection | Expiry jobs; must release on failure |
+| **C. Reserve → pending order → pay → commit** | Hold stock → create `pending_payment` order → payment → commit | Strong oversell protection | Expiry jobs; must release on **cancellation** or **TTL expiry** (not on ordinary payment failure—retries while active) |
 | **D. Authorize payment then reserve** | Auth card → reserve → capture | Good for card auth | Provider-dependent; complex |
 
 ### Recommendation for MVP: **Strategy C** (pending order + reservation first)
@@ -66,21 +66,27 @@ This is the **default target** for a single-store MVP with manual FX and hosted/
 
 | Mechanism | Purpose |
 | --- | --- |
-| `orders.idempotency_key` | Duplicate “Place order” submits |
+| `orders.idempotency_key` | Duplicate “Place order” submits with the **same payload** |
 | `payments.idempotency_key` | Duplicate payment initiation / retries |
 | `payment_provider_events` UNIQUE `(provider, provider_event_id)` | Duplicate webhooks |
 | Provider signature / amount verification | Untrusted callbacks until verified |
 
-Replays return the existing in-progress checkout or success state without double-charging or double-reserving.
+Replays with the **same** idempotency key and **equivalent** checkout payload return the existing in-progress checkout or success state without double-charging or double-reserving.
+
+**Place-order idempotency conflict:** Reusing `orders.idempotency_key` with a **different** checkout payload (cart lines, addresses, transaction currency, or other material fields) returns **HTTP 409 Conflict**—do not create a second order.
+
+**Payment retries:** Stay on the **same** pending order. Each retry creates a **new** `payments` row (`attempt_number` incremented, new `payments.idempotency_key`), preserving full per-attempt history on the order.
 
 ### Payment failure, reservation expiry, and recovery
 
 | Scenario | Handling |
 | --- | --- |
-| Payment declined | `payments.status = failed`; order **`payment_failed`**; **retry** new `payments` row on **same order** while reservation **active** |
-| Customer abandons redirect | Order `payment_failed`; reservation remains until TTL unless policy releases earlier |
+| Payment declined | `payments.status = failed`; order **`payment_failed`**; **do not** release reservations; **retry** new `payments` row on **same order** while reservation **active** |
+| Customer abandons redirect | Order `payment_failed`; reservation **remains active** for retry until TTL (not released on failure alone) |
+| Customer or admin **cancellation** | Order **`cancelled`**; `ReleaseReservationAction` for active reservations |
 | Reservation TTL expires | `ExpireReservationsJob` releases stock; order **`cancelled`**; customer must start **new** checkout (`new idempotency_key` / new order) |
 | Retry after expiry | **Not allowed** on same order—prevent duplicate captures by enforcing reservation state on `InitiatePaymentAction` |
+| Late payment success after reservation expired | Order already **`cancelled`**; stock released. Handler must **not** auto-confirm order or `CommitReservationAction`. Route to **reconciliation** (ops alert; provider void/refund per runbook) |
 | Webhook before browser return | Idempotent handler updates order; redirect shows success |
 | Capture succeeded, DB commit fails | **Reconciliation job** + alert; never re-run capture blindly |
 | Admin changes FX rate | Affects **new** checkouts only; orders/payments unchanged |
@@ -232,7 +238,7 @@ sequenceDiagram
     GW-->>HTTP: redirect URL (controller returns redirect/view)
 ```
 
-**Duplicate submit:** Same `orders.idempotency_key` returns existing pending order / in-progress payment (no double order).
+**Duplicate submit:** Same `orders.idempotency_key` **and equivalent payload** returns existing pending order / in-progress payment (no double order). Same key with different payload → **HTTP 409 Conflict**.
 
 ---
 
@@ -299,8 +305,9 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | Place order | Reserve | `quantity_reserved` += qty | `active` |
 | Payment success | Commit | `on_hand` -= qty, `reserved` -= qty | `committed` |
-| Payment fail / cancel | Release | `reserved` -= qty | `released` |
-| TTL expired (job) | Expire | `reserved` -= qty | `expired` |
+| Payment failure (`payment_failed`) | Hold (retry) | No change | `active` (same order; new `payments` row while active) |
+| Order cancellation | Release | `reserved` -= qty | `released` |
+| TTL expired (job) | Expire / release | `reserved` -= qty | `expired` |
 | Admin adjustment | Adjust | `on_hand` += delta | — |
 
 Each change logs `inventory_movements`.
@@ -314,7 +321,7 @@ Each change logs `inventory_movements`.
 1. Customer A and B both checkout last unit.
 2. First transaction reserves 1 → success, order pending.
 3. Second transaction reserve → **insufficient** → rollback; user sees out-of-stock message.
-4. If A’s payment fails and reservation released, B may succeed on retry.
+4. If A’s payment fails, A’s reservation **stays active** until TTL or cancel; B cannot take the unit while A holds it. If A’s reservation **expires or is cancelled**, B may succeed on a new checkout.
 
 ---
 
@@ -336,11 +343,14 @@ Each change logs `inventory_movements`.
 
 | Scenario | Expected behavior |
 | --- | --- |
-| Double-click Place Order | Idempotency returns same payment session |
+| Double-click Place Order | Idempotency returns same payment session (same key + same payload) |
+| Same place-order idempotency key, different payload | **HTTP 409 Conflict** |
+| Payment retry | Same order; new `payments` row (`attempt_number++`); prior attempts retained |
 | Duplicate webhook | Ignored via `payment_provider_events` |
 | Webhook before redirect | Order paid; redirect shows success |
 | Payment success, commit fails | **Critical:** retry job; alert ops; payment captured flag vs stock mismatch—manual reconciliation |
-| Reservation expires while paying | Release stock; payment capture should fail or void (provider); order cancelled |
+| Reservation expires while paying | `ExpireReservationsJob` releases stock; order **cancelled**; provider capture should fail or void where possible |
+| Late payment success after reservation expired | **Reconciliation only**—no auto order confirm, no stock commit |
 | Admin deletes variant with orders | FK SET NULL on `order_items.product_variant_id`; snapshots retain sku/name |
 | Catalog price changes mid-cart | `RefreshCartPricesAction` at checkout or place order |
 | Display currency = EGP, pay in USD | Checkout `transaction_currency_code` = USD; order stored in USD |
