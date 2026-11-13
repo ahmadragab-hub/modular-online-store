@@ -3,6 +3,7 @@
 namespace App\Domains\Catalog\Models;
 
 use App\Domains\Cart\Models\CartItem;
+use App\Domains\Orders\Models\OrderItem;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -78,6 +79,14 @@ class ProductVariant extends Model
     public function cartItems(): HasMany
     {
         return $this->hasMany(CartItem::class);
+    }
+
+    /**
+     * @return HasMany<OrderItem, $this>
+     */
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
     }
 
     /**

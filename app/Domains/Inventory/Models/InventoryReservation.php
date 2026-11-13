@@ -4,6 +4,7 @@ namespace App\Domains\Inventory\Models;
 
 use App\Domains\Cart\Models\Cart;
 use App\Domains\Catalog\Models\ProductVariant;
+use App\Domains\Orders\Models\Order;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -61,8 +62,12 @@ class InventoryReservation extends Model
     }
 
     /**
-     * `order_id` belongsTo Order is deferred until the Orders domain model exists.
+     * @return BelongsTo<Order, $this>
      */
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
+    }
 
     /**
      * @param  Builder<InventoryReservation>  $query

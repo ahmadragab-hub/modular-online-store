@@ -2,6 +2,7 @@
 
 namespace App\Domains\Store\Models;
 
+use App\Domains\Orders\Models\Order;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -46,5 +47,25 @@ class Currency extends Model
     public function exchangeRates(): HasMany
     {
         return $this->hasMany(CurrencyExchangeRate::class, 'quote_currency_code', 'code');
+    }
+
+    /**
+     * Orders frozen with this currency as catalog/base reference.
+     *
+     * @return HasMany<Order, $this>
+     */
+    public function ordersAsBaseCurrency(): HasMany
+    {
+        return $this->hasMany(Order::class, 'base_currency_code', 'code');
+    }
+
+    /**
+     * Orders charged in this transaction currency.
+     *
+     * @return HasMany<Order, $this>
+     */
+    public function ordersAsTransactionCurrency(): HasMany
+    {
+        return $this->hasMany(Order::class, 'currency_code', 'code');
     }
 }

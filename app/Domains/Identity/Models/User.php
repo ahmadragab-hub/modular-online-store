@@ -4,6 +4,7 @@ namespace App\Domains\Identity\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Domains\Customers\Models\Customer;
+use App\Domains\Orders\Models\Order;
 use App\Domains\Store\Models\CurrencyExchangeRate;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -56,6 +57,14 @@ class User extends Authenticatable
     public function customer(): HasOne
     {
         return $this->hasOne(Customer::class);
+    }
+
+    /**
+     * @return HasMany<Order, $this>
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
     }
 
     protected static function newFactory(): UserFactory
