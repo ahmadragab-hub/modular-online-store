@@ -2,6 +2,7 @@
 
 namespace App\Domains\Inventory\Models;
 
+use App\Domains\Cart\Models\Cart;
 use App\Domains\Catalog\Models\ProductVariant;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -52,8 +53,15 @@ class InventoryReservation extends Model
     }
 
     /**
-     * Cart and Order Eloquent relationships are deferred until those domain models exist.
-     * Columns `cart_id` and `order_id` remain fillable for persistence and future belongsTo wiring.
+     * @return BelongsTo<Cart, $this>
+     */
+    public function cart(): BelongsTo
+    {
+        return $this->belongsTo(Cart::class);
+    }
+
+    /**
+     * `order_id` belongsTo Order is deferred until the Orders domain model exists.
      */
 
     /**
