@@ -130,7 +130,7 @@ Checkout is an orchestration domain. It coordinates Cart, Inventory, Payments, O
 1. **Inside a short DB transaction:** validate cart, resolve customer, compute totals in **transaction currency** (Store), create **`pending_payment` order** with frozen FX snapshots, **reserve stock**, insert **pending** `payments` row (no gateway call yet).
 2. **After commit:** `InitiatePaymentAction` calls the **payment provider** (HTTP/API)—**never inside** the transaction above.
 3. **On verified success** (signed return URL and/or idempotent webhook): update payment, mark order paid/processing, **commit** stock, clear cart—in a **new** DB transaction.
-4. **On failure / expiry:** fail payment, release reservations, allow retry per policy; reservation TTL job cancels stale pending orders.
+4. **On payment failure (decline / abandon redirect):** mark payment and order `payment_failed`; **do not** release reservations— the customer may **retry payment on the same pending order** while reservations remain **active** (new `payments` row per attempt). **On cancellation or reservation expiry:** `ReleaseReservationAction` and cancel the order; `ExpireReservationsJob` handles TTL expiry for stale `pending_payment` / `payment_failed` orders.
 
 ```mermaid
 sequenceDiagram
@@ -165,7 +165,7 @@ sequenceDiagram
 
 **Idempotency:** `orders.idempotency_key`, `orders.public_uuid` for provider return URLs, `payments.idempotency_key`, and `payment_provider_events (provider, provider_event_id)` prevent duplicate orders and double processing. **No `checkout_sessions` table in MVP.**
 
-**Recovery:** Failed payments → `ReleaseReservationAction`; duplicate webhooks → ignore; reservation expiry → job releases stock and cancels stale `pending_payment` orders; payment captured but commit fails → reconciliation job (documented in BUSINESS_WORKFLOWS).
+**Recovery:** Failed payments **do not** auto-release reservations (retry on same order while stock is held). Duplicate webhooks → ignore. **Cancellation** or **reservation expiry** → release stock and cancel eligible orders. Payment captured locally but commit fails → reconciliation job. **Late payment success after reservation expiry** → reconciliation only—do not auto-confirm the order or commit stock (see BUSINESS_WORKFLOWS).
 
 Final sequencing may be adjusted when the **payment provider** is chosen.
 
@@ -203,7 +203,7 @@ Not implemented in the foundation phase; ownership is fixed early to avoid rewor
 | SKU | **Catalog** | Unique per variant; stable identifier for integrations |
 | Variant price (USD) | **Catalog** | Base currency; converted for display/checkout via **Store** |
 | Stock quantity | **Inventory** | Per variant/SKU; separate from merchandising data |
-| Stock reservation | **Inventory** | During checkout; TTL or release on failure |
+| Stock reservation | **Inventory** | During checkout; stays **active** after ordinary payment failure (retry on same order); released on **order cancellation** or **TTL expiry** (`ExpireReservationsJob`) |
 | Images | **Catalog** | Storage paths or media library integration later |
 | Cart lines | **Cart** | Reference variant SKU, qty, USD base snapshot |
 | Order lines | **Orders** | Snapshot catalog + transaction currency amounts at purchase time |
