@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-arabic: 'Noto Sans Arabic', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+:root,
+[data-theme='light'] {
+    color-scheme: light;
+    --sf-bg: #f4f4f5;
+    --sf-surface: #ffffff;
+    --sf-text: #18181b;
+    --sf-muted: #52525b;
+    --sf-border: #e4e4e7;
+    --sf-accent: #18181b;
+    --sf-accent-text: #fafafa;
+}
+
+[data-theme='dark'] {
+    color-scheme: dark;
+    --sf-bg: #09090b;
+    --sf-surface: #18181b;
+    --sf-text: #fafafa;
+    --sf-muted: #a1a1aa;
+    --sf-border: #3f3f46;
+    --sf-accent: #fafafa;
+    --sf-accent-text: #18181b;
+}
+
+.storefront-body {
+    background-color: var(--sf-bg);
+    color: var(--sf-text);
+    font-family: var(--font-sans);
+}
+
+[dir='rtl'] .storefront-body {
+    font-family: var(--font-arabic);
+}
