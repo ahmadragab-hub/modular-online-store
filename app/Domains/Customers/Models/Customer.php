@@ -2,6 +2,7 @@
 
 namespace App\Domains\Customers\Models;
 
+use App\Domains\Cart\Models\Cart;
 use App\Domains\Identity\Models\User;
 use App\Domains\Store\Models\Currency;
 use App\Domains\Store\Models\StoreLocale;
@@ -75,6 +76,14 @@ class Customer extends Model
     public function addresses(): HasMany
     {
         return $this->hasMany(CustomerAddress::class);
+    }
+
+    /**
+     * @return HasMany<Cart, $this>
+     */
+    public function carts(): HasMany
+    {
+        return $this->hasMany(Cart::class);
     }
 
     /**
