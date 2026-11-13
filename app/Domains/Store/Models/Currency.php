@@ -3,6 +3,7 @@
 namespace App\Domains\Store\Models;
 
 use App\Domains\Orders\Models\Order;
+use App\Domains\Payments\Models\Payment;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -67,5 +68,15 @@ class Currency extends Model
     public function ordersAsTransactionCurrency(): HasMany
     {
         return $this->hasMany(Order::class, 'currency_code', 'code');
+    }
+
+    /**
+     * Payment attempts charged in this currency (frozen snapshot per row).
+     *
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'currency_code', 'code');
     }
 }
