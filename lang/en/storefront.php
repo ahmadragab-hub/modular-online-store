@@ -4,6 +4,7 @@ return [
     'brand' => 'Fashion Store',
     'tagline' => 'Contemporary clothing for every day.',
     'nav' => [
+        'main' => 'Main navigation',
         'home' => 'Home',
         'shop' => 'Shop',
         'cart' => 'Cart',
@@ -18,6 +19,23 @@ return [
         'title' => 'Welcome',
         'intro' => 'Your modular fashion storefront supports English and Arabic with light and dark themes.',
         'catalog_soon' => 'Product catalog and checkout will appear here as domains are implemented.',
+        'browse_shop' => 'Browse the shop',
+    ],
+    'shop' => [
+        'title' => 'Shop',
+        'intro' => 'Discover our latest fashion pieces.',
+        'from' => 'From',
+        'no_image' => 'No image',
+        'empty_title' => 'No products yet',
+        'empty_message' => 'Check back soon for new arrivals.',
+    ],
+    'products' => [
+        'back_to_shop' => 'Back to shop',
+        'images' => 'Product images',
+        'variants' => 'Sizes & colors',
+        'sku' => 'SKU',
+        'in_stock' => ':count available',
+        'out_of_stock' => 'Out of stock',
     ],
     'checkout' => [
         'title' => 'Checkout',

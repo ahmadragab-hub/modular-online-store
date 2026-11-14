@@ -11,8 +11,11 @@
         <p class="mt-4 max-w-2xl text-lg leading-relaxed text-[var(--sf-muted)]">
             {{ __('storefront.home.intro') }}
         </p>
-        <p class="mt-6 rounded-lg border border-dashed border-[var(--sf-border)] bg-[var(--sf-surface)] px-4 py-3 text-sm text-[var(--sf-muted)]">
-            {{ __('storefront.home.catalog_soon') }}
-        </p>
+        <a
+            href="{{ route('storefront.shop.index') }}"
+            class="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--sf-accent)] px-5 py-2.5 text-sm font-medium text-[var(--sf-accent-text)] transition hover:opacity-90"
+        >
+            {{ __('storefront.home.browse_shop') }}
+        </a>
     </main>
 @endsection
