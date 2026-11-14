@@ -111,4 +111,27 @@ class Product extends Model
     {
         return $query->where('status', self::STATUS_DRAFT);
     }
+
+    /**
+     * Published products sellable on the storefront for the given locale.
+     *
+     * Aligns with checkout preparation rules: both en and ar translations, at least one active variant,
+     * and a row for the requested locale (no cross-locale fallback).
+     *
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeStorefrontEligible(Builder $query, string $locale): Builder
+    {
+        return $query
+            ->published()
+            ->whereHas('translations', function (Builder $translationQuery) use ($locale): void {
+                $translationQuery->where('locale', $locale);
+            })
+            ->whereHas('translationEn')
+            ->whereHas('translationAr')
+            ->whereHas('variants', function (Builder $variantQuery): void {
+                $variantQuery->where('status', ProductVariant::STATUS_ACTIVE);
+            });
+    }
 }
