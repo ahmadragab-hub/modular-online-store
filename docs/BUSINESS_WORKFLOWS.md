@@ -195,13 +195,28 @@ sequenceDiagram
 
 ## Workflow: Customer adds variant to cart
 
-1. HTTP → `AddCartItemAction` with `product_variant_id`, `quantity`.
-2. Cart → Catalog: variant exists, `published` product, `active` variant.
-3. Cart → Inventory: optional soft check (available qty); **strict check at checkout**.
-4. Cart upserts `cart_items` with **USD `unit_price_base`** from Catalog.
-5. Guest: `GetOrCreateCartAction` binds `session_token`; `display_currency_code` from preference.
+**Implemented (Phase 3 — domain only):** `AddCartItemAction`, `UpdateCartItemQuantityAction`, and `RemoveCartItemAction` are implemented. They accept a trusted `Cart` model (no HTTP in this layer).
 
-**Failure:** Unpublished variant → 422; insufficient stock → 422 optional on add (MVP: allow add, block at checkout).
+**Planned (Phase 4 — not implemented yet):** Storefront HTTP controllers, `GetOrCreateCartAction`, guest `session_token` binding (and `display_currency_code` from preference), and mapping `CartMutationException` to HTTP **422** responses.
+
+### Add
+
+1. Caller invokes `AddCartItemAction` with `product_variant_id`, `quantityDelta`, and `contentLocale` (today: direct Action call or tests; Phase 4: HTTP controller after cart resolution).
+2. Cart → Catalog: `ResolveVariantForCartLineQuery` (active variant, `published` product, en+ar and content-locale translations).
+3. Cart → Inventory: `GetAvailableQuantityForVariantsQuery` enforces `max(0, on_hand - reserved)` on add and update (no reservation).
+4. Cart upserts `cart_items` with **USD `unit_price_base`** and localized snapshots from Catalog (merge duplicate variants per unique constraint).
+
+### Update
+
+`UpdateCartItemQuantityAction` revalidates sellability, stock, and refreshes snapshots. Quantity must be ≥ 1 (use remove to delete a line).
+
+### Remove
+
+`RemoveCartItemAction` deletes the line without catalog or stock checks so customers can clear items even when a product became unpublished or out of stock. Requires an **active** cart (including expired active carts); converted/abandoned carts are rejected.
+
+### Failure
+
+Unavailable variant or insufficient stock → domain `CartMutationException` with stable error codes. HTTP 422 mapping is **Phase 4**. Checkout reservation remains the final stock protection.
 
 ---
 
