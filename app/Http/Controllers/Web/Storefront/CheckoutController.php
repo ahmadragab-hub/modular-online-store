@@ -9,22 +9,55 @@ use App\Domains\Checkout\Exceptions\PlaceOrderIdempotencyConflictException;
 use App\Domains\Inventory\Exceptions\InsufficientStockException;
 use App\Domains\Inventory\Exceptions\InvalidStockReservationRequestException;
 use App\Domains\Orders\Models\Order;
+use App\Domains\Store\Models\Currency;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\PlaceOrderRequest;
+use App\Http\Storefront\GuestCartResolver;
+use App\Shared\Support\GuestCartSession;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CheckoutController extends Controller
 {
-    public function show(): View
+    public function show(GuestCartResolver $guestCartResolver, Request $request): View
     {
-        return view('storefront.checkout.show');
+        $cart = $guestCartResolver->loadCartWithItems($guestCartResolver->resolve($request)->cart);
+
+        $transactionCurrencies = Currency::query()
+            ->where('transaction_enabled', true)
+            ->orderBy('sort_order')
+            ->orderBy('code')
+            ->get();
+
+        return view('storefront.checkout.show', [
+            'cart' => $cart,
+            'transactionCurrencies' => $transactionCurrencies,
+            'defaultTransactionCurrency' => 'USD',
+        ]);
     }
 
-    public function store(PlaceOrderRequest $request, PlaceOrderAction $placeOrderAction): RedirectResponse
-    {
+    public function store(
+        PlaceOrderRequest $request,
+        PlaceOrderAction $placeOrderAction,
+        GuestCartResolver $guestCartResolver,
+    ): RedirectResponse {
+        $cart = $guestCartResolver->loadCartWithItems($guestCartResolver->resolve($request)->cart);
+        $idempotencyKey = (string) $request->validated('idempotency_key');
+        $hasExistingOrder = Order::query()->where('idempotency_key', $idempotencyKey)->exists();
+
+        if (! $hasExistingOrder && $cart->items->isEmpty()) {
+            return back()
+                ->withInput()
+                ->withErrors(['checkout' => __('storefront.checkout.errors.cart')]);
+        }
+
         try {
-            $result = $placeOrderAction->execute($request->toPlaceOrderInput());
+            $result = $placeOrderAction->execute($request->toPlaceOrderInput($cart));
+
+            if (! $result->idempotentReplay) {
+                $request->session()->put(GuestCartSession::SESSION_KEY, GuestCartSession::generateToken());
+            }
 
             return redirect()
                 ->route('storefront.checkout.success', ['publicUuid' => $result->publicUuid])

@@ -2,10 +2,30 @@
 
 namespace Tests\Feature\Web;
 
+use App\Shared\Support\StorefrontPreferences;
+use Database\Seeders\CurrencySeeder;
+use Database\Seeders\StoreLocaleSeeder;
+use Database\Seeders\StoreSettingsSeeder;
+use Database\Seeders\StoreThemeSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class StorefrontPreferencesTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed([
+            CurrencySeeder::class,
+            StoreLocaleSeeder::class,
+            StoreThemeSeeder::class,
+            StoreSettingsSeeder::class,
+        ]);
+    }
+
     public function test_homepage_renders_with_default_locale_and_theme(): void
     {
         $response = $this->get(route('storefront.home'));
@@ -51,5 +71,14 @@ class StorefrontPreferencesTest extends TestCase
             ->post(route('storefront.locale'), ['locale' => 'fr']);
 
         $response->assertSessionHasErrors('locale');
+    }
+
+    public function test_customer_can_switch_display_currency(): void
+    {
+        $response = $this->from(route('storefront.home'))
+            ->post(route('storefront.currency'), ['display_currency_code' => 'EGP']);
+
+        $response->assertRedirect(route('storefront.home'));
+        $response->assertCookie(StorefrontPreferences::COOKIE_DISPLAY_CURRENCY, 'EGP');
     }
 }

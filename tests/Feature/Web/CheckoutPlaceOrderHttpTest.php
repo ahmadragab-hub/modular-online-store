@@ -5,8 +5,10 @@ namespace Tests\Feature\Web;
 use App\Domains\Cart\Models\Cart;
 use App\Domains\Catalog\Models\ProductVariant;
 use App\Domains\Identity\Models\User;
+use App\Domains\Inventory\Models\InventoryReservation;
 use App\Domains\Orders\Models\Order;
 use App\Domains\Store\Models\StoreSetting;
+use App\Shared\Support\GuestCartSession;
 use Database\Seeders\CurrencySeeder;
 use Database\Seeders\StoreLocaleSeeder;
 use Database\Seeders\StoreSettingsSeeder;
@@ -45,8 +47,6 @@ class CheckoutPlaceOrderHttpTest extends TestCase
         $addresses = $this->defaultAddresses();
 
         return [
-            'cart_id' => $cart->getKey(),
-            'session_token' => $cart->session_token,
             'transaction_currency_code' => 'USD',
             'content_locale' => 'en',
             'idempotency_key' => $idempotencyKey,
@@ -61,13 +61,51 @@ class CheckoutPlaceOrderHttpTest extends TestCase
         $this->get(route('storefront.checkout.show'))->assertOk();
     }
 
+    public function test_empty_cart_cannot_place_order(): void
+    {
+        $this->withSession([GuestCartSession::SESSION_KEY => GuestCartSession::generateToken()])
+            ->from(route('storefront.checkout.show'))
+            ->post(route('storefront.checkout.store'), [
+                'transaction_currency_code' => 'USD',
+                'content_locale' => 'en',
+                'idempotency_key' => hash('sha256', 'empty-http-'.uniqid()),
+                'guest_email' => 'guest@example.com',
+                'shipping_address' => $this->defaultAddresses()['shipping'],
+                'billing_address' => $this->defaultAddresses()['billing'],
+            ])
+            ->assertRedirect(route('storefront.checkout.show'))
+            ->assertSessionHasErrors('checkout');
+
+        $this->assertSame(0, Order::query()->count());
+    }
+
     public function test_validation_errors_for_missing_required_fields(): void
     {
         $response = $this->from(route('storefront.checkout.show'))
             ->post(route('storefront.checkout.store'), []);
 
         $response->assertRedirect(route('storefront.checkout.show'));
-        $response->assertSessionHasErrors(['cart_id', 'idempotency_key']);
+        $response->assertSessionHasErrors(['idempotency_key']);
+    }
+
+    public function test_checkout_uses_cart_from_session_not_client_cart_id(): void
+    {
+        ['variant' => $variant] = $this->createPublishedSellableVariant();
+        $cart = $this->createGuestCartWithItem($variant);
+        $other = $this->createGuestCartWithItem($variant);
+        $this->assertNotSame($cart->getKey(), $other->getKey());
+
+        $idempotencyKey = hash('sha256', 'session-cart-'.uniqid());
+        $payload = $this->validPayload($cart, $idempotencyKey);
+
+        $this->withSession([GuestCartSession::SESSION_KEY => $cart->session_token])
+            ->post(route('storefront.checkout.store'), array_merge($payload, ['cart_id' => $other->getKey()]))
+            ->assertRedirect();
+
+        $order = Order::query()->where('idempotency_key', $idempotencyKey)->firstOrFail();
+        $reservationCartId = (int) InventoryReservation::query()->value('cart_id');
+        $this->assertSame($cart->getKey(), $reservationCartId);
+        $this->assertNotNull($order);
     }
 
     public function test_successful_guest_checkout_redirects_to_success_page(): void
@@ -76,7 +114,8 @@ class CheckoutPlaceOrderHttpTest extends TestCase
         $cart = $this->createGuestCartWithItem($variant);
         $idempotencyKey = hash('sha256', 'http-'.uniqid());
 
-        $response = $this->post(route('storefront.checkout.store'), $this->validPayload($cart, $idempotencyKey));
+        $response = $this->withSession([GuestCartSession::SESSION_KEY => $cart->session_token])
+            ->post(route('storefront.checkout.store'), $this->validPayload($cart, $idempotencyKey));
 
         $order = Order::query()->where('idempotency_key', $idempotencyKey)->first();
         $this->assertNotNull($order);
@@ -89,11 +128,14 @@ class CheckoutPlaceOrderHttpTest extends TestCase
     public function test_wrong_session_token_returns_cart_error_without_internal_details(): void
     {
         ['variant' => $variant] = $this->createPublishedSellableVariant();
-        $cart = $this->createGuestCartWithItem($variant);
-        $payload = $this->validPayload($cart, hash('sha256', 'own-'.uniqid()));
-        $payload['session_token'] = 'wrong-token';
+        $this->createGuestCartWithItem($variant);
+        $payload = $this->validPayload(
+            Cart::query()->firstOrFail(),
+            hash('sha256', 'own-'.uniqid()),
+        );
 
-        $response = $this->from(route('storefront.checkout.show'))
+        $response = $this->withSession([GuestCartSession::SESSION_KEY => 'wrong-token'])
+            ->from(route('storefront.checkout.show'))
             ->post(route('storefront.checkout.store'), $payload);
 
         $response->assertRedirect(route('storefront.checkout.show'));
@@ -108,10 +150,13 @@ class CheckoutPlaceOrderHttpTest extends TestCase
         $idempotencyKey = hash('sha256', 'http-409-'.uniqid());
         $payload = $this->validPayload($cart, $idempotencyKey);
 
-        $this->post(route('storefront.checkout.store'), $payload)->assertRedirect();
+        $this->withSession([GuestCartSession::SESSION_KEY => $cart->session_token])
+            ->post(route('storefront.checkout.store'), $payload)
+            ->assertRedirect();
 
         $payload['billing_address']['city'] = 'Giza';
-        $response = $this->post(route('storefront.checkout.store'), $payload);
+        $response = $this->withSession([GuestCartSession::SESSION_KEY => $cart->session_token])
+            ->post(route('storefront.checkout.store'), $payload);
         $response->assertStatus(409);
     }
 
@@ -125,6 +170,7 @@ class CheckoutPlaceOrderHttpTest extends TestCase
         unset($payload['guest_email']);
 
         $this->actingAs($user)
+            ->withSession([GuestCartSession::SESSION_KEY => $cart->session_token])
             ->post(route('storefront.checkout.store'), $payload)
             ->assertRedirect();
     }

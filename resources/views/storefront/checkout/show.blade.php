@@ -13,23 +13,23 @@
             </div>
         @endif
 
+        <p class="mb-4 text-sm text-[var(--sf-muted)]">
+            {{ __('storefront.checkout.cart_items_count', ['count' => $cart->items->count()]) }}
+        </p>
+        <p class="mb-4 text-sm text-[var(--sf-muted)]">{{ __('storefront.checkout.transaction_currency_note') }}</p>
+
         <form method="post" action="{{ route('storefront.checkout.store') }}" class="space-y-4">
             @csrf
-            <div>
-                <label class="block text-sm font-medium" for="cart_id">{{ __('storefront.checkout.cart_id') }}</label>
-                <input class="mt-1 w-full rounded border px-3 py-2" type="number" name="cart_id" id="cart_id"
-                       value="{{ old('cart_id') }}" required min="1">
-            </div>
-            <div>
-                <label class="block text-sm font-medium" for="session_token">{{ __('storefront.checkout.session_token') }}</label>
-                <input class="mt-1 w-full rounded border px-3 py-2" type="text" name="session_token" id="session_token"
-                       value="{{ old('session_token') }}">
-            </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium" for="transaction_currency_code">{{ __('storefront.checkout.currency') }}</label>
-                    <input class="mt-1 w-full rounded border px-3 py-2" type="text" name="transaction_currency_code"
-                           id="transaction_currency_code" value="{{ old('transaction_currency_code', 'USD') }}" required maxlength="3">
+                    <select class="mt-1 w-full rounded border px-3 py-2" name="transaction_currency_code" id="transaction_currency_code" required>
+                        @foreach ($transactionCurrencies as $currency)
+                            <option value="{{ $currency->code }}" @selected(old('transaction_currency_code', $defaultTransactionCurrency) === $currency->code)>
+                                {{ $currency->code }} — {{ $currency->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium" for="content_locale">{{ __('storefront.checkout.locale') }}</label>
@@ -45,7 +45,7 @@
             <div>
                 <label class="block text-sm font-medium" for="idempotency_key">{{ __('storefront.checkout.idempotency_key') }}</label>
                 <input class="mt-1 w-full rounded border px-3 py-2" type="text" name="idempotency_key" id="idempotency_key"
-                       value="{{ old('idempotency_key') }}" required maxlength="64">
+                       value="{{ old('idempotency_key', hash('sha256', uniqid('checkout-', true))) }}" required maxlength="64">
             </div>
 
             <fieldset class="rounded border p-4">

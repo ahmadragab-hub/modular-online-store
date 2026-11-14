@@ -2,7 +2,9 @@
 
 namespace Tests\Integration\MySQL;
 
+use App\Domains\Cart\Models\Cart;
 use App\Domains\Checkout\Actions\PlaceOrderAction;
+use App\Domains\Checkout\Exceptions\CheckoutPreparationException;
 use App\Domains\Inventory\Actions\ReserveStockForCartAction;
 use App\Domains\Inventory\DTOs\ReserveStockForCartInput;
 use App\Domains\Inventory\DTOs\ReserveStockForCartLineInput;
@@ -95,6 +97,32 @@ class CheckoutConcurrencyTest extends TestCase
 
         $this->assertTrue($second->reusedExistingReservations);
         $this->assertSame(1, $cart->reservations()->where('status', 'active')->count());
+    }
+
+    /**
+     * InnoDB: the second caller blocks on carts.lock until the first transaction commits with status converted.
+     * This test runs attempts serially in one process; true parallel contention requires separate connections.
+     */
+    public function test_same_cart_different_idempotency_keys_create_only_one_order(): void
+    {
+        ['variant' => $variant] = $this->createPublishedSellableVariant();
+        $cart = $this->createGuestCartWithItem($variant);
+        $action = $this->app->make(PlaceOrderAction::class);
+        $keyA = hash('sha256', 'mysql-cart-a-'.Str::random(16));
+        $keyB = hash('sha256', 'mysql-cart-b-'.Str::random(16));
+
+        $first = $action->execute($this->placeOrderInput($cart, $keyA));
+
+        try {
+            $action->execute($this->placeOrderInput($cart, $keyB));
+            $this->fail('Expected CheckoutPreparationException.');
+        } catch (CheckoutPreparationException $exception) {
+            $this->assertSame(CheckoutPreparationException::CART_NOT_ACTIVE, $exception->errorCode);
+        }
+
+        $this->assertSame(1, Order::query()->count());
+        $this->assertSame(Cart::STATUS_CONVERTED, $cart->fresh()->status);
+        $this->assertNotNull($first->orderId);
     }
 
     public function test_concurrent_place_order_idempotency_key_creates_single_order(): void
