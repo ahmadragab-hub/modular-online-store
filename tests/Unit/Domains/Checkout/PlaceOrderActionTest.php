@@ -8,7 +8,6 @@ use App\Domains\Checkout\Exceptions\CheckoutPreparationException;
 use App\Domains\Checkout\Exceptions\PlaceOrderException;
 use App\Domains\Checkout\Exceptions\PlaceOrderIdempotencyConflictException;
 use App\Domains\Identity\Models\User;
-use App\Domains\Inventory\Exceptions\InvalidStockReservationRequestException;
 use App\Domains\Inventory\Models\InventoryLevel;
 use App\Domains\Inventory\Models\InventoryMovement;
 use App\Domains\Inventory\Models\InventoryReservation;
@@ -139,14 +138,16 @@ class PlaceOrderActionTest extends TestCase
         $this->assertNotNull($order->currency_exchange_rate_id);
     }
 
-    public function test_cart_remains_active_after_success(): void
+    public function test_cart_is_converted_after_success(): void
     {
         ['variant' => $variant] = $this->createPublishedSellableVariant();
         $cart = $this->createGuestCartWithItem($variant);
 
         $this->action->execute($this->placeOrderInput($cart, hash('sha256', 'active-'.uniqid())));
 
-        $this->assertSame(Cart::STATUS_ACTIVE, $cart->fresh()->status);
+        $fresh = $cart->fresh();
+        $this->assertSame(Cart::STATUS_CONVERTED, $fresh->status);
+        $this->assertNull($fresh->session_token);
     }
 
     public function test_insufficient_stock_rolls_back_persisted_rows(): void
@@ -192,6 +193,26 @@ class PlaceOrderActionTest extends TestCase
         $this->action->execute($this->placeOrderInput($cart, hash('sha256', 'ship-'.uniqid())));
     }
 
+    public function test_idempotent_replay_does_not_depend_on_current_cart_lines(): void
+    {
+        ['variant' => $variant] = $this->createPublishedSellableVariant();
+        $cart = $this->createGuestCartWithItem($variant);
+        $idempotencyKey = hash('sha256', 'idem-lines-'.uniqid());
+        $input = $this->placeOrderInput($cart, $idempotencyKey);
+
+        $first = $this->action->execute($input);
+
+        $cart->items()->delete();
+
+        $otherCart = $this->createGuestCartWithItem($variant);
+        $replayInput = $this->placeOrderInput($otherCart, $idempotencyKey);
+
+        $replay = $this->action->execute($replayInput);
+
+        $this->assertTrue($replay->idempotentReplay);
+        $this->assertSame($first->orderId, $replay->orderId);
+    }
+
     public function test_idempotent_retry_returns_same_order(): void
     {
         ['variant' => $variant] = $this->createPublishedSellableVariant();
@@ -200,6 +221,8 @@ class PlaceOrderActionTest extends TestCase
         $input = $this->placeOrderInput($cart, $idempotencyKey);
 
         $first = $this->action->execute($input);
+        $reservationCount = InventoryReservation::query()->count();
+        $movementCount = InventoryMovement::query()->count();
         $second = $this->action->execute($input);
 
         $this->assertTrue($second->idempotentReplay);
@@ -207,6 +230,8 @@ class PlaceOrderActionTest extends TestCase
         $this->assertSame($first->paymentId, $second->paymentId);
         $this->assertSame(1, Order::query()->where('idempotency_key', $idempotencyKey)->count());
         $this->assertSame(1, Payment::query()->where('order_id', $first->orderId)->count());
+        $this->assertSame($reservationCount, InventoryReservation::query()->count());
+        $this->assertSame($movementCount, InventoryMovement::query()->count());
     }
 
     public function test_second_order_on_same_cart_with_different_idempotency_key_rejected(): void
@@ -225,12 +250,9 @@ class PlaceOrderActionTest extends TestCase
 
         try {
             $this->action->execute($this->placeOrderInput($cart, $keyB));
-            $this->fail('Expected InvalidStockReservationRequestException.');
-        } catch (InvalidStockReservationRequestException $exception) {
-            $this->assertSame(
-                InvalidStockReservationRequestException::ACTIVE_RESERVATIONS_LINKED_TO_ORDER,
-                $exception->errorCode,
-            );
+            $this->fail('Expected CheckoutPreparationException.');
+        } catch (CheckoutPreparationException $exception) {
+            $this->assertSame(CheckoutPreparationException::CART_NOT_ACTIVE, $exception->errorCode);
         }
 
         $this->assertSame(1, Order::query()->count());
@@ -256,6 +278,70 @@ class PlaceOrderActionTest extends TestCase
 
         $this->expectException(PlaceOrderIdempotencyConflictException::class);
         $this->action->execute($this->placeOrderInput($cart, $idempotencyKey, billingCity: 'Alexandria'));
+    }
+
+    public function test_authenticated_user_idempotent_replay_with_same_user_succeeds(): void
+    {
+        $user = User::factory()->create();
+        ['variant' => $variant] = $this->createPublishedSellableVariant();
+        $cart = $this->createRegisteredCartWithItem($user, $variant);
+        $idempotencyKey = hash('sha256', 'auth-idem-'.uniqid());
+        $input = $this->placeOrderInput($cart, $idempotencyKey, userId: $user->getKey());
+
+        $first = $this->action->execute($input);
+        $second = $this->action->execute($input);
+
+        $this->assertTrue($second->idempotentReplay);
+        $this->assertSame($first->orderId, $second->orderId);
+    }
+
+    public function test_different_authenticated_user_cannot_replay_same_idempotency_key(): void
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        ['variant' => $variant] = $this->createPublishedSellableVariant();
+        $cart = $this->createRegisteredCartWithItem($owner, $variant);
+        $idempotencyKey = hash('sha256', 'auth-cross-'.uniqid());
+
+        $this->action->execute($this->placeOrderInput($cart, $idempotencyKey, userId: $owner->getKey()));
+
+        $intruderCart = $this->createRegisteredCartWithItem($intruder, $variant);
+
+        $this->expectException(PlaceOrderIdempotencyConflictException::class);
+        $this->action->execute($this->placeOrderInput($intruderCart, $idempotencyKey, userId: $intruder->getKey()));
+    }
+
+    public function test_guest_order_cannot_be_replayed_as_authenticated_user(): void
+    {
+        ['variant' => $variant] = $this->createPublishedSellableVariant();
+        $cart = $this->createGuestCartWithItem($variant);
+        $idempotencyKey = hash('sha256', 'guest-auth-'.uniqid());
+
+        $this->action->execute($this->placeOrderInput($cart, $idempotencyKey));
+
+        $user = User::factory()->create();
+        $userCart = $this->createRegisteredCartWithItem($user, $variant);
+
+        $this->expectException(PlaceOrderIdempotencyConflictException::class);
+        $this->action->execute($this->placeOrderInput($userCart, $idempotencyKey, userId: $user->getKey()));
+    }
+
+    public function test_guest_same_key_replay_after_session_cart_change_still_succeeds(): void
+    {
+        ['variant' => $variant] = $this->createPublishedSellableVariant();
+        $cart = $this->createGuestCartWithItem($variant);
+        $idempotencyKey = hash('sha256', 'guest-rotate-'.uniqid());
+        $input = $this->placeOrderInput($cart, $idempotencyKey);
+
+        $first = $this->action->execute($input);
+
+        $replacement = $this->createGuestCartWithItem($variant);
+        $replayInput = $this->placeOrderInput($replacement, $idempotencyKey);
+
+        $replay = $this->action->execute($replayInput);
+
+        $this->assertTrue($replay->idempotentReplay);
+        $this->assertSame($first->orderId, $replay->orderId);
     }
 
     public function test_guest_checkout_disabled_rejected(): void

@@ -14,6 +14,10 @@ final class StorefrontPreferences
 
     public const COOKIE_THEME = 'storefront_theme';
 
+    public const SESSION_DISPLAY_CURRENCY = 'storefront.display_currency';
+
+    public const COOKIE_DISPLAY_CURRENCY = 'storefront_display_currency';
+
     /**
      * @return array<string, array{label: string, native?: string, dir: string, html: string}>
      */

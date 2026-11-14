@@ -3,12 +3,12 @@
 namespace App\Domains\Checkout\Actions;
 
 use App\Domains\Cart\Models\Cart;
-use App\Domains\Cart\Models\CartItem;
 use App\Domains\Catalog\Models\ProductVariant;
 use App\Domains\Checkout\DTOs\PlaceOrderInput;
 use App\Domains\Checkout\DTOs\PlaceOrderResult;
 use App\Domains\Checkout\DTOs\PrepareCheckoutInput;
 use App\Domains\Checkout\DTOs\PrepareCheckoutLineResult;
+use App\Domains\Checkout\Exceptions\CheckoutPreparationException;
 use App\Domains\Checkout\Exceptions\PlaceOrderException;
 use App\Domains\Checkout\Exceptions\PlaceOrderIdempotencyConflictException;
 use App\Domains\Checkout\Support\PlaceOrderPayloadFingerprint;
@@ -113,6 +113,8 @@ final class PlaceOrderAction
 
     private function createNewOrder(PlaceOrderInput $input): PlaceOrderResult
     {
+        $this->lockActiveCartForPlaceOrder($input->cartId);
+
         $prepared = $this->prepareCheckoutAction->execute(new PrepareCheckoutInput(
             cartId: $input->cartId,
             transactionCurrencyCode: $input->transactionCurrencyCode,
@@ -223,6 +225,11 @@ final class PlaceOrderAction
             'idempotency_key' => $paymentIdempotencyKey,
         ]);
 
+        Cart::query()->whereKey($input->cartId)->update([
+            'status' => Cart::STATUS_CONVERTED,
+            'session_token' => null,
+        ]);
+
         return new PlaceOrderResult(
             orderId: $order->getKey(),
             publicUuid: $order->public_uuid,
@@ -232,6 +239,30 @@ final class PlaceOrderAction
             currencyCode: $order->currency_code,
             idempotentReplay: false,
         );
+    }
+
+    /**
+     * Row lock is held until the surrounding {@see PlaceOrderAction::execute} transaction commits,
+     * preventing concurrent checkouts from both observing an active cart on the same row (InnoDB).
+     */
+    private function lockActiveCartForPlaceOrder(int $cartId): void
+    {
+        /** @var Cart|null $cart */
+        $cart = Cart::query()->whereKey($cartId)->lockForUpdate()->first();
+
+        if ($cart === null) {
+            throw new CheckoutPreparationException(
+                CheckoutPreparationException::CART_NOT_FOUND,
+                'Cart not found.',
+            );
+        }
+
+        if ($cart->status !== Cart::STATUS_ACTIVE) {
+            throw new CheckoutPreparationException(
+                CheckoutPreparationException::CART_NOT_ACTIVE,
+                'Cart is not active.',
+            );
+        }
     }
 
     private function buildIdempotentReplay(Order $order, PlaceOrderInput $input): PlaceOrderResult
@@ -253,17 +284,7 @@ final class PlaceOrderAction
             ])
             ->all();
 
-        $cartLines = CartItem::query()
-            ->where('cart_id', $input->cartId)
-            ->orderBy('product_variant_id')
-            ->get()
-            ->map(static fn (CartItem $item): array => [
-                'product_variant_id' => (int) $item->product_variant_id,
-                'quantity' => (int) $item->quantity,
-            ])
-            ->all();
-
-        $incomingFingerprint = $this->payloadFingerprint->fromPlaceOrderInput($input, $cartLines);
+        $incomingFingerprint = $this->payloadFingerprint->fromPlaceOrderInput($input, $orderLines, $cartId);
         $storedFingerprint = $this->payloadFingerprint->fromOrder($order, $cartId, $orderLines);
 
         if (! hash_equals($storedFingerprint, $incomingFingerprint)) {

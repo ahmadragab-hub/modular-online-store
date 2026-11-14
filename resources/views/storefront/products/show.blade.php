@@ -46,6 +46,10 @@
                     </div>
                 @endif
 
+                <p class="mt-4 text-sm text-[var(--sf-muted)]">{{ __('storefront.shop.indicative_notice') }}</p>
+                @if (! $detail['fx_available'])
+                    <p class="mt-2 text-sm text-[var(--sf-muted)]">{{ __('storefront.cart.fx_unavailable') }}</p>
+                @endif
                 <h2 class="mt-10 text-lg font-semibold text-[var(--sf-text)]">{{ __('storefront.products.variants') }}</h2>
                 <ul class="mt-4 divide-y divide-[var(--sf-border)] rounded-xl border border-[var(--sf-border)] bg-[var(--sf-surface)]">
                     @foreach ($detail['variants'] as $variant)
@@ -55,11 +59,19 @@
                                 <p class="text-[var(--sf-muted)]">{{ __('storefront.products.sku') }}: {{ $variant['sku'] }}</p>
                             </div>
                             <div class="text-end">
-                                <p class="font-medium text-[var(--sf-text)]">{{ $variant['price_usd'] }}</p>
+                                <p class="font-medium text-[var(--sf-text)]">{{ $variant['price_display'] }}</p>
                                 @if ($variant['in_stock'])
                                     <p class="text-[var(--sf-muted)]">
                                         {{ __('storefront.products.in_stock', ['count' => $variant['available_quantity']]) }}
                                     </p>
+                                    <form method="post" action="{{ route('storefront.cart.items.store') }}" class="mt-2 inline-flex items-center gap-2">
+                                        @csrf
+                                        <input type="hidden" name="product_variant_id" value="{{ $variant['id'] }}">
+                                        <input type="hidden" name="quantity" value="1">
+                                        <button type="submit" class="rounded-md bg-[var(--sf-accent)] px-3 py-1.5 text-xs font-medium text-[var(--sf-accent-text)]">
+                                            {{ __('storefront.products.add_to_cart') }}
+                                        </button>
+                                    </form>
                                 @else
                                     <p class="font-medium text-red-600 dark:text-red-400">{{ __('storefront.products.out_of_stock') }}</p>
                                 @endif

@@ -197,7 +197,7 @@ sequenceDiagram
 
 **Implemented (Phase 3 — domain only):** `AddCartItemAction`, `UpdateCartItemQuantityAction`, and `RemoveCartItemAction` are implemented. They accept a trusted `Cart` model (no HTTP in this layer).
 
-**Planned (Phase 4 — not implemented yet):** Storefront HTTP controllers, `GetOrCreateCartAction`, guest `session_token` binding (and `display_currency_code` from preference), and mapping `CartMutationException` to HTTP **422** responses.
+**Implemented (Phase 4 — HTTP/session):** Storefront cart routes, `GetOrCreateCartAction`, guest `session_token` in Laravel session (`cart_session_token`), checkout resolves cart from session, and `CartMutationException` mapped to **422** / **404** HTTP responses. Display currency on new carts uses `ResolveDisplayCurrencyCodeQuery` (store default until preference UI exists).
 
 ### Add
 

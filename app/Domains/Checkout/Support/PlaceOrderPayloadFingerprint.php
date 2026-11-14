@@ -10,12 +10,13 @@ final class PlaceOrderPayloadFingerprint
     /**
      * @param  list<array{product_variant_id: int, quantity: int}>  $lines
      */
-    public function fromPlaceOrderInput(PlaceOrderInput $input, array $lines): string
+    public function fromPlaceOrderInput(PlaceOrderInput $input, array $lines, ?int $cartId = null): string
     {
         return $this->hash($this->canonicalPayload(
-            cartId: $input->cartId,
+            cartId: $cartId ?? $input->cartId,
             transactionCurrencyCode: $input->transactionCurrencyCode,
             contentLocale: $input->contentLocale,
+            userId: $input->userId,
             guestEmail: $input->guestEmail,
             shippingAddress: $input->shippingAddress,
             billingAddress: $input->billingAddress,
@@ -33,6 +34,7 @@ final class PlaceOrderPayloadFingerprint
             cartId: $cartId,
             transactionCurrencyCode: $order->currency_code,
             contentLocale: $order->content_locale,
+            userId: $order->user_id !== null ? (int) $order->user_id : null,
             guestEmail: $order->guest_email,
             shippingAddress: $order->shipping_address,
             billingAddress: $order->billing_address,
@@ -51,6 +53,7 @@ final class PlaceOrderPayloadFingerprint
         int $cartId,
         string $transactionCurrencyCode,
         string $contentLocale,
+        ?int $userId,
         ?string $guestEmail,
         array $shippingAddress,
         array $billingAddress,
@@ -74,6 +77,7 @@ final class PlaceOrderPayloadFingerprint
                 $lines,
             ),
             'shipping' => $this->normalizeAddress($shippingAddress),
+            'user_id' => $userId,
         ];
     }
 

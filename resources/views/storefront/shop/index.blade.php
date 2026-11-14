@@ -7,6 +7,7 @@
         <header class="mb-8">
             <h1 class="text-3xl font-semibold tracking-tight text-[var(--sf-text)]">{{ __('storefront.shop.title') }}</h1>
             <p class="mt-2 text-[var(--sf-muted)]">{{ __('storefront.shop.intro') }}</p>
+            <p class="mt-2 text-sm text-[var(--sf-muted)]">{{ __('storefront.shop.indicative_notice') }}</p>
         </header>
 
         @if ($products->isEmpty())

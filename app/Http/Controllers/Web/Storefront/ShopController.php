@@ -26,8 +26,10 @@ class ShopController extends Controller
 
         $products->withQueryString();
 
+        $displayCurrency = (string) ($request->attributes->get('storefront.display_currency') ?? 'USD');
+
         $cards = $products->getCollection()
-            ->map(fn ($product) => $presenter->toListingCard($product))
+            ->map(fn ($product) => $presenter->toListingCard($product, $displayCurrency))
             ->values()
             ->all();
 

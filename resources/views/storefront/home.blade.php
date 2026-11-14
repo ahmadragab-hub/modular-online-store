@@ -11,11 +11,19 @@
         <p class="mt-4 max-w-2xl text-lg leading-relaxed text-[var(--sf-muted)]">
             {{ __('storefront.home.intro') }}
         </p>
-        <a
-            href="{{ route('storefront.shop.index') }}"
-            class="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--sf-accent)] px-5 py-2.5 text-sm font-medium text-[var(--sf-accent-text)] transition hover:opacity-90"
-        >
-            {{ __('storefront.home.browse_shop') }}
-        </a>
+        <div class="mt-8 flex flex-wrap gap-3">
+            <a
+                href="{{ route('storefront.shop.index') }}"
+                class="inline-flex items-center justify-center rounded-lg bg-[var(--sf-accent)] px-5 py-2.5 text-sm font-medium text-[var(--sf-accent-text)] transition hover:opacity-90"
+            >
+                {{ __('storefront.home.browse_shop') }}
+            </a>
+            <a
+                href="{{ route('storefront.cart.show') }}"
+                class="inline-flex items-center justify-center rounded-lg border border-[var(--sf-border)] px-5 py-2.5 text-sm font-medium text-[var(--sf-text)] transition hover:border-[var(--sf-muted)]"
+            >
+                {{ __('storefront.home.view_cart') }}
+            </a>
+        </div>
     </main>
 @endsection

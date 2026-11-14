@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Web;
 
+use App\Domains\Cart\Models\Cart;
 use App\Domains\Checkout\DTOs\PlaceOrderInput;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -20,13 +21,11 @@ class PlaceOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'cart_id' => ['required', 'integer', 'min:1'],
             'transaction_currency_code' => ['required', 'string', 'size:3'],
             'content_locale' => ['required', 'string', 'max:5'],
             'idempotency_key' => ['required', 'string', 'max:64'],
             'guest_email' => [Rule::requiredIf(fn (): bool => ! Auth::check()), 'nullable', 'email', 'max:255'],
             'customer_note' => ['nullable', 'string', 'max:500'],
-            'session_token' => ['nullable', 'string', 'max:64'],
             'shipping_address' => ['required', 'array'],
             'shipping_address.first_name' => ['required', 'string', 'max:100'],
             'shipping_address.last_name' => ['required', 'string', 'max:100'],
@@ -42,14 +41,13 @@ class PlaceOrderRequest extends FormRequest
         ];
     }
 
-    public function toPlaceOrderInput(): PlaceOrderInput
+    public function toPlaceOrderInput(Cart $cart): PlaceOrderInput
     {
         $validated = $this->validated();
         $userId = Auth::id();
-        $sessionToken = $validated['session_token'] ?? $this->session()->get('cart_session_token');
 
         return new PlaceOrderInput(
-            cartId: (int) $validated['cart_id'],
+            cartId: $cart->getKey(),
             transactionCurrencyCode: strtoupper($validated['transaction_currency_code']),
             contentLocale: $validated['content_locale'],
             idempotencyKey: $validated['idempotency_key'],
@@ -58,7 +56,7 @@ class PlaceOrderRequest extends FormRequest
             guestEmail: $validated['guest_email'] ?? null,
             customerNote: $validated['customer_note'] ?? null,
             userId: $userId !== null ? (int) $userId : null,
-            sessionToken: is_string($sessionToken) ? $sessionToken : null,
+            sessionToken: $cart->session_token !== null ? (string) $cart->session_token : null,
         );
     }
 }

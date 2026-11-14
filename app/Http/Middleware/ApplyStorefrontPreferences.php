@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Domains\Store\Queries\ListDisplayEnabledCurrenciesQuery;
+use App\Domains\Store\Queries\ResolveDisplayCurrencyCodeQuery;
 use App\Shared\Support\StorefrontPreferences;
 use Closure;
 use Illuminate\Http\Request;
@@ -15,12 +17,16 @@ class ApplyStorefrontPreferences
     {
         $locale = $this->resolveLocale($request);
         $theme = $this->resolveTheme($request);
+        $displayCurrencyCandidate = $this->resolveDisplayCurrencyCandidate($request);
+        $displayCurrency = app(ResolveDisplayCurrencyCodeQuery::class)->resolve($displayCurrencyCandidate);
 
         App::setLocale($locale);
 
         View::share([
             'storefrontLocale' => $locale,
             'storefrontTheme' => $theme,
+            'storefrontDisplayCurrency' => $displayCurrency,
+            'storefrontDisplayCurrencies' => app(ListDisplayEnabledCurrenciesQuery::class)->execute(),
             'storefrontTextDirection' => StorefrontPreferences::textDirection($locale),
             'storefrontHtmlLang' => StorefrontPreferences::htmlLang($locale),
             'storefrontLocales' => StorefrontPreferences::locales(),
@@ -29,6 +35,7 @@ class ApplyStorefrontPreferences
 
         $request->attributes->set('storefront.locale', $locale);
         $request->attributes->set('storefront.theme', $theme);
+        $request->attributes->set('storefront.display_currency', $displayCurrency);
 
         return $next($request);
     }
@@ -73,5 +80,25 @@ class ApplyStorefrontPreferences
         }
 
         return StorefrontPreferences::defaultTheme();
+    }
+
+    private function resolveDisplayCurrencyCandidate(Request $request): ?string
+    {
+        $sessionValue = $request->hasSession()
+            ? $request->session()->get(StorefrontPreferences::SESSION_DISPLAY_CURRENCY)
+            : null;
+
+        $candidates = [
+            $sessionValue,
+            $request->cookie(StorefrontPreferences::COOKIE_DISPLAY_CURRENCY),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return strtoupper(trim($candidate));
+            }
+        }
+
+        return null;
     }
 }
