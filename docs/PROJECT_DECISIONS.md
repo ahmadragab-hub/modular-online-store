@@ -301,6 +301,10 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 | AUTH-007 | Regenerate session after login and registration |
 | AUTH-008 | Logout invalidates session and regenerates CSRF token |
 
+**Global authentication redirects (Milestone 9.1 implementation note)**
+- `bootstrap/app.php` configures Laravel `redirectGuestsTo` and `redirectUsersTo` for the **storefront customer** login and home routes.
+- When **admin authentication** is implemented, this configuration must be revisited so unauthenticated admin requests redirect to the **admin login**, not the customer login. Do not rely on the current global redirects for admin areas without that adjustment.
+
 ### Customer records
 
 | ID | Decision |

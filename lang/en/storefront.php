@@ -99,4 +99,37 @@ return [
             'not_found' => 'Order not found.',
         ],
     ],
+    'auth' => [
+        'login' => [
+            'title' => 'Sign in',
+            'intro' => 'Access your customer account to continue shopping.',
+            'email' => 'Email',
+            'password' => 'Password',
+            'submit' => 'Sign in',
+            'failed' => 'These credentials do not match our records.',
+            'register_prompt' => 'New here?',
+            'register_link' => 'Create an account',
+        ],
+        'register' => [
+            'title' => 'Create account',
+            'intro' => 'Register to shop with your customer account.',
+            'first_name' => 'First name',
+            'last_name' => 'Last name',
+            'email' => 'Email',
+            'password' => 'Password',
+            'password_confirmation' => 'Confirm password',
+            'submit' => 'Register',
+            'email_taken' => 'This email is already registered.',
+            'failed' => 'Registration could not be completed.',
+            'login_prompt' => 'Already have an account?',
+            'login_link' => 'Sign in',
+        ],
+        'logout' => [
+            'submit' => 'Sign out',
+        ],
+    ],
+    'account' => [
+        'title' => 'Your account',
+        'placeholder' => 'Account settings will be available in a future update.',
+    ],
 ];

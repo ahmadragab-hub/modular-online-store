@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Controllers\Web\Storefront\AccountController;
+use App\Http\Controllers\Web\Storefront\Auth\LoginCustomerController;
+use App\Http\Controllers\Web\Storefront\Auth\LogoutCustomerController;
+use App\Http\Controllers\Web\Storefront\Auth\RegisterCustomerController;
 use App\Http\Controllers\Web\Storefront\CartController;
 use App\Http\Controllers\Web\Storefront\CheckoutController;
 use App\Http\Controllers\Web\Storefront\HomeController;
@@ -7,6 +11,25 @@ use App\Http\Controllers\Web\Storefront\PreferenceController;
 use App\Http\Controllers\Web\Storefront\ProductController;
 use App\Http\Controllers\Web\Storefront\ShopController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware('guest')->group(function (): void {
+    Route::get('/register', [RegisterCustomerController::class, 'create'])->name('storefront.register.create');
+    Route::post('/register', [RegisterCustomerController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('storefront.register.store');
+    Route::get('/login', [LoginCustomerController::class, 'create'])->name('storefront.login.create');
+    Route::post('/login', [LoginCustomerController::class, 'store'])
+        ->middleware('throttle:5,1')
+        ->name('storefront.login.store');
+});
+
+Route::post('/logout', [LogoutCustomerController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('storefront.logout.destroy');
+
+Route::middleware(['auth', 'customer'])->group(function (): void {
+    Route::get('/account', [AccountController::class, 'index'])->name('storefront.account.index');
+});
 
 Route::get('/', [HomeController::class, 'index'])->name('storefront.home');
 

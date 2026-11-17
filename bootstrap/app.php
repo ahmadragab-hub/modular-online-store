@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\ApplyStorefrontPreferences;
+use App\Http\Middleware\EnsureCustomerUser;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,6 +15,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->alias([
+            'customer' => EnsureCustomerUser::class,
+        ]);
+
+        $middleware->redirectGuestsTo(fn () => route('storefront.login.create'));
+        $middleware->redirectUsersTo(fn () => route('storefront.home'));
+
         $middleware->web(append: [
             ApplyStorefrontPreferences::class,
         ]);
