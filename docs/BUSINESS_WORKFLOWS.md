@@ -220,6 +220,22 @@ Unavailable variant or insufficient stock → domain `CartMutationException` wit
 
 ---
 
+## Workflow: Authenticated cart and guest-cart merge (Milestone 9)
+
+**Implemented (customer accounts):** Logged-in customers resolve a single **active** cart by `customer_id` via `GetOrCreateCustomerCartAction` (`GuestCartResolver` delegates by auth state). Guests continue using `session_token` via `GetOrCreateCartAction`.
+
+**After registration or login:**
+
+1. HTTP layer preserves the guest `cart_session_token` across `session()->regenerate()`, then calls `MergeGuestCartIntoCustomerCartAction`.
+2. Inside one database transaction: lock guest cart (if any items), get/create customer cart, merge lines with `AddCartItemAction::executeMergeLine` (sum quantities; cap to available stock; record per-line outcomes).
+3. On success: guest cart → `abandoned`, `session_token` cleared; guest session key removed.
+4. On failure: rollback; guest cart unchanged; session flash `cart_merge` explains outcome (EN/AR).
+5. If multiple active carts exist for one customer → **stop** (`MultipleActiveCustomerCartsException`); no silent cleanup (**AUTH-024**). **AUTH-025** (approved 2026-11-17) documents interim application enforcement via customer-row locking in `GetOrCreateCustomerCartAction`. **DB-013** (DB enforcement mechanism) remains **Open** and must be resolved before production hardening.
+
+Checkout, stock reservation, and `PlaceOrderAction` are unchanged; cart ownership at checkout still uses existing `PrepareCheckoutAction` rules.
+
+---
+
 ## Workflow: Customer checks out (place order)
 
 See Strategy C diagram:

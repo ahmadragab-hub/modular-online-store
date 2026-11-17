@@ -49,7 +49,7 @@
 | --- | --- |
 | **Stable branch** | `main` at `5b18d1f` (merge of PR #8) |
 | **Current branch** | `feature/customer-authentication-and-accounts` (planning / in progress; **not merged**) |
-| **Milestone 9 status** | **Planned / not implemented** — customer auth and accounts |
+| **Milestone 9 status** | **Implemented on feature branch** — auth (9.1), cart merge, profile, addresses, storefront integration |
 
 ### Merged milestones (Git)
 
@@ -66,10 +66,8 @@
 
 ### Milestone 9 implementation sequence (Approved)
 
-1. **9.1** Authentication
-2. **9.2** Authenticated cart and guest-cart merge
-3. **9.3** Customer profile and addresses
-4. **9.4** Storefront integration and regression testing
+1. **9.1** Authentication — **done** (feature branch)
+2. **9.2–9.4** Authenticated cart, guest-cart merge, profile, addresses, storefront integration — **done** (consolidated implementation on feature branch)
 
 ### Current implementation facts (not milestones)
 
@@ -330,12 +328,19 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 | AUTH-022 | After successful merge: guest cart **abandoned**, guest session token cleared |
 | AUTH-023 | One active cart per customer (**approved business invariant**) |
 | AUTH-024 | If multiple active carts for one customer → **STOP, REPORT**; do not silently fix |
-| AUTH-025 | Enforce one-active-cart during normal ops; handle concurrent creation safely |
+| AUTH-025 | Interim one-active-cart enforcement (application-level) |
 
 **AUTH-023 — One active cart per customer**
 - **Status:** Approved.
 - **Statement:** Each registered customer has at most one active cart under normal operations. This is a **business invariant**, distinct from how it is enforced in the database (**DB-013** remains **Open**).
 - **Date:** 2026-11-16.
+
+**AUTH-025 — Interim one-active-cart enforcement**
+- **Status:** Approved.
+- **Date:** 2026-11-17.
+- **Statement:** **AUTH-023** remains the business invariant. Under normal operations, authenticated customer cart creation and resolution **must** go through `GetOrCreateCustomerCartAction`, which locks the owning `Customer` row inside a transaction before checking for or creating the customer's active cart. If multiple active carts already exist for a customer, the application **stops and reports** (**AUTH-024**); it must **not** automatically delete, abandon, or merge duplicate active carts as repair.
+- **Limits:** This is an interim **application-level** guarantee for cooperating application paths only. It is **not** a database-level guarantee against writers that bypass the Action. **DB-013** remains **Open** — database-level enforcement is **not** approved or implemented. **DB-013** must be resolved before production hardening.
+- **Verification:** Customer-cart concurrent creation has **not** been verified by a dedicated MySQL integration test that exercises true parallel connections.
 
 ### Profile and addresses
 
@@ -454,6 +459,7 @@ Compact index. See sections A–L for narrative. **Change history:** none supers
 | DB-012 | Cross-domain via Actions | Approved | not established |
 | DB-013 | One-active-cart database enforcement mechanism | Open | not established |
 | AUTH-023 | One active cart per customer (business invariant) | Approved | 2026-11-16 |
+| AUTH-025 | Interim one-active-cart enforcement (application-level) | Approved | 2026-11-17 |
 | CUR-001–010 | Currency and money rules | Approved | 2026-03-20 |
 | LOC-001–006 | Locale, theme, translations | Approved | 2026-03-20 |
 | CAT-001–003 | Catalog rules | Approved | 2026-03-20 |

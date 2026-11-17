@@ -6,9 +6,11 @@ use App\Http\Controllers\Web\Storefront\Auth\LogoutCustomerController;
 use App\Http\Controllers\Web\Storefront\Auth\RegisterCustomerController;
 use App\Http\Controllers\Web\Storefront\CartController;
 use App\Http\Controllers\Web\Storefront\CheckoutController;
+use App\Http\Controllers\Web\Storefront\CustomerAddressController;
 use App\Http\Controllers\Web\Storefront\HomeController;
 use App\Http\Controllers\Web\Storefront\PreferenceController;
 use App\Http\Controllers\Web\Storefront\ProductController;
+use App\Http\Controllers\Web\Storefront\ProfileController;
 use App\Http\Controllers\Web\Storefront\ShopController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,8 +29,20 @@ Route::post('/logout', [LogoutCustomerController::class, 'destroy'])
     ->middleware('auth')
     ->name('storefront.logout.destroy');
 
-Route::middleware(['auth', 'customer'])->group(function (): void {
-    Route::get('/account', [AccountController::class, 'index'])->name('storefront.account.index');
+Route::middleware(['auth', 'customer'])->prefix('account')->name('storefront.account.')->group(function (): void {
+    Route::get('/', [AccountController::class, 'index'])->name('index');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::get('/addresses', [CustomerAddressController::class, 'index'])->name('addresses.index');
+    Route::get('/addresses/create', [CustomerAddressController::class, 'create'])->name('addresses.create');
+    Route::post('/addresses', [CustomerAddressController::class, 'store'])->name('addresses.store');
+    Route::get('/addresses/{address}/edit', [CustomerAddressController::class, 'edit'])->name('addresses.edit');
+    Route::put('/addresses/{address}', [CustomerAddressController::class, 'update'])->name('addresses.update');
+    Route::delete('/addresses/{address}', [CustomerAddressController::class, 'destroy'])->name('addresses.destroy');
+    Route::post('/addresses/{address}/default-shipping', [CustomerAddressController::class, 'defaultShipping'])
+        ->name('addresses.default-shipping');
+    Route::post('/addresses/{address}/default-billing', [CustomerAddressController::class, 'defaultBilling'])
+        ->name('addresses.default-billing');
 });
 
 Route::get('/', [HomeController::class, 'index'])->name('storefront.home');

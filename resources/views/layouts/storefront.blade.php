@@ -21,6 +21,7 @@
 </head>
 <body class="storefront-body min-h-screen antialiased">
     @include('storefront.partials.preference-bar')
+    @include('storefront.partials.cart-merge-flash')
 
     @yield('content')
 
