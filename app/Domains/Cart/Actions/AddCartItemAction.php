@@ -2,6 +2,7 @@
 
 namespace App\Domains\Cart\Actions;
 
+use App\Domains\Cart\DTOs\AddCartItemMergeLineResult;
 use App\Domains\Cart\Exceptions\CartMutationException;
 use App\Domains\Cart\Models\Cart;
 use App\Domains\Cart\Models\CartItem;
@@ -33,59 +34,165 @@ final class AddCartItemAction
         }
 
         return DB::transaction(function () use ($cart, $productVariantId, $quantityDelta, $contentLocale): CartItem {
-            /** @var Cart|null $lockedCart */
-            $lockedCart = Cart::query()->whereKey($cart->getKey())->lockForUpdate()->first();
+            $lockedCart = $this->lockActiveCart($cart);
 
-            if ($lockedCart === null) {
-                throw new CartMutationException(
-                    CartMutationException::CART_NOT_ACTIVE,
-                    'This cart is no longer active.',
-                );
-            }
+            return $this->addLineStrict($lockedCart, $productVariantId, $quantityDelta, $contentLocale);
+        });
+    }
 
-            CartMutationGuards::assertActiveAndNotExpired($lockedCart);
+    public function executeMergeLine(
+        Cart $cart,
+        int $productVariantId,
+        int $quantityDelta,
+        string $contentLocale,
+    ): AddCartItemMergeLineResult {
+        if ($quantityDelta < 1) {
+            return new AddCartItemMergeLineResult(
+                AddCartItemMergeLineResult::STATUS_UNAVAILABLE,
+                $productVariantId,
+                '',
+                $quantityDelta,
+                0,
+                0,
+            );
+        }
 
-            try {
-                $variant = $this->resolveVariantForCartLineQuery->resolve($productVariantId, $contentLocale);
-            } catch (VariantUnavailableForCartException) {
-                throw new CartMutationException(
-                    CartMutationException::VARIANT_UNAVAILABLE,
-                    'The selected product variant is not available.',
-                );
-            }
+        $lockedCart = $this->lockActiveCart($cart);
 
-            $existing = CartItem::query()
-                ->where('cart_id', $lockedCart->getKey())
-                ->where('product_variant_id', $variant->getKey())
-                ->first();
+        try {
+            $variant = $this->resolveVariantForCartLineQuery->resolve($productVariantId, $contentLocale);
+        } catch (VariantUnavailableForCartException) {
+            return new AddCartItemMergeLineResult(
+                AddCartItemMergeLineResult::STATUS_UNAVAILABLE,
+                $productVariantId,
+                '',
+                $quantityDelta,
+                0,
+                0,
+            );
+        }
 
-            $newQuantity = ($existing?->quantity ?? 0) + $quantityDelta;
+        $productName = $variant->product?->name ?? $variant->sku;
 
-            $available = $this->availableQuantityForVariantsQuery->quantitiesForVariantIds([$variant->getKey()]);
-            $availableQuantity = $available[$variant->getKey()] ?? 0;
+        $existing = CartItem::query()
+            ->where('cart_id', $lockedCart->getKey())
+            ->where('product_variant_id', $variant->getKey())
+            ->first();
 
-            if ($newQuantity > $availableQuantity) {
-                throw new CartMutationException(
-                    CartMutationException::INSUFFICIENT_STOCK,
-                    'There is not enough stock for the requested quantity.',
-                );
-            }
+        $existingQuantity = (int) ($existing?->quantity ?? 0);
+        $requestedTotal = $existingQuantity + $quantityDelta;
 
+        $available = $this->availableQuantityForVariantsQuery->quantitiesForVariantIds([$variant->getKey()]);
+        $availableQuantity = $available[$variant->getKey()] ?? 0;
+
+        if ($availableQuantity < 1) {
+            return new AddCartItemMergeLineResult(
+                AddCartItemMergeLineResult::STATUS_NO_STOCK,
+                $variant->getKey(),
+                $productName,
+                $quantityDelta,
+                0,
+                $existingQuantity,
+            );
+        }
+
+        $finalQuantity = min($requestedTotal, $availableQuantity);
+        $quantityAdded = max(0, $finalQuantity - $existingQuantity);
+        $status = AddCartItemMergeLineResult::STATUS_MERGED;
+
+        if ($finalQuantity < $requestedTotal) {
+            $status = AddCartItemMergeLineResult::STATUS_CAPPED;
+        }
+
+        if ($quantityAdded > 0) {
             $snapshots = CartLineSnapshots::fromVariant($variant, $contentLocale);
 
             if ($existing !== null) {
-                $existing->fill(array_merge($snapshots, ['quantity' => $newQuantity]));
+                $existing->fill(array_merge($snapshots, ['quantity' => $finalQuantity]));
                 $existing->save();
-
-                return $existing->refresh();
+            } else {
+                CartItem::query()->create([
+                    'cart_id' => $lockedCart->getKey(),
+                    'product_variant_id' => $variant->getKey(),
+                    'quantity' => $finalQuantity,
+                    ...$snapshots,
+                ]);
             }
+        }
 
-            return CartItem::query()->create([
-                'cart_id' => $lockedCart->getKey(),
-                'product_variant_id' => $variant->getKey(),
-                'quantity' => $newQuantity,
-                ...$snapshots,
-            ]);
-        });
+        return new AddCartItemMergeLineResult(
+            $status,
+            $variant->getKey(),
+            $productName,
+            $quantityDelta,
+            $quantityAdded,
+            $quantityAdded > 0 ? $finalQuantity : $existingQuantity,
+        );
+    }
+
+    private function lockActiveCart(Cart $cart): Cart
+    {
+        /** @var Cart|null $lockedCart */
+        $lockedCart = Cart::query()->whereKey($cart->getKey())->lockForUpdate()->first();
+
+        if ($lockedCart === null) {
+            throw new CartMutationException(
+                CartMutationException::CART_NOT_ACTIVE,
+                'This cart is no longer active.',
+            );
+        }
+
+        CartMutationGuards::assertActiveAndNotExpired($lockedCart);
+
+        return $lockedCart;
+    }
+
+    private function addLineStrict(
+        Cart $lockedCart,
+        int $productVariantId,
+        int $quantityDelta,
+        string $contentLocale,
+    ): CartItem {
+        try {
+            $variant = $this->resolveVariantForCartLineQuery->resolve($productVariantId, $contentLocale);
+        } catch (VariantUnavailableForCartException) {
+            throw new CartMutationException(
+                CartMutationException::VARIANT_UNAVAILABLE,
+                'The selected product variant is not available.',
+            );
+        }
+
+        $existing = CartItem::query()
+            ->where('cart_id', $lockedCart->getKey())
+            ->where('product_variant_id', $variant->getKey())
+            ->first();
+
+        $newQuantity = ($existing?->quantity ?? 0) + $quantityDelta;
+
+        $available = $this->availableQuantityForVariantsQuery->quantitiesForVariantIds([$variant->getKey()]);
+        $availableQuantity = $available[$variant->getKey()] ?? 0;
+
+        if ($newQuantity > $availableQuantity) {
+            throw new CartMutationException(
+                CartMutationException::INSUFFICIENT_STOCK,
+                'There is not enough stock for the requested quantity.',
+            );
+        }
+
+        $snapshots = CartLineSnapshots::fromVariant($variant, $contentLocale);
+
+        if ($existing !== null) {
+            $existing->fill(array_merge($snapshots, ['quantity' => $newQuantity]));
+            $existing->save();
+
+            return $existing->refresh();
+        }
+
+        return CartItem::query()->create([
+            'cart_id' => $lockedCart->getKey(),
+            'product_variant_id' => $variant->getKey(),
+            'quantity' => $newQuantity,
+            ...$snapshots,
+        ]);
     }
 }

@@ -14,6 +14,20 @@
                 <a href="{{ route('storefront.cart.show') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
                     {{ __('storefront.nav.cart') }}
                 </a>
+                @auth
+                    @if (auth()->user()->role === \App\Domains\Identity\Models\User::ROLE_CUSTOMER && auth()->user()->isActive())
+                        <a href="{{ route('storefront.account.index') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
+                            {{ __('storefront.nav.account') }}
+                        </a>
+                    @endif
+                @else
+                    <a href="{{ route('storefront.login.create') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
+                        {{ __('storefront.nav.login') }}
+                    </a>
+                    <a href="{{ route('storefront.register.create') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
+                        {{ __('storefront.nav.register') }}
+                    </a>
+                @endauth
             </nav>
         </div>
 
@@ -85,6 +99,17 @@
                     </form>
                 @endforeach
             </div>
+
+            @auth
+                @if (auth()->user()->role === \App\Domains\Identity\Models\User::ROLE_CUSTOMER && auth()->user()->isActive())
+                    <form method="post" action="{{ route('storefront.logout.destroy') }}" class="inline">
+                        @csrf
+                        <button type="submit" class="rounded-md border border-[var(--sf-border)] px-3 py-1.5 font-medium text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
+                            {{ __('storefront.nav.logout') }}
+                        </button>
+                    </form>
+                @endif
+            @endauth
         </nav>
     </div>
 </header>

@@ -6,6 +6,7 @@ use App\Domains\Cart\Actions\AddCartItemAction;
 use App\Domains\Cart\Actions\RemoveCartItemAction;
 use App\Domains\Cart\Actions\UpdateCartItemQuantityAction;
 use App\Domains\Cart\Exceptions\CartMutationException;
+use App\Domains\Cart\Models\Cart;
 use App\Domains\Cart\Models\CartItem;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreCartItemRequest;
@@ -63,6 +64,7 @@ class CartController extends Controller
         UpdateCartItemQuantityAction $updateCartItemQuantityAction,
     ): RedirectResponse {
         $cart = $guestCartResolver->resolve($request)->cart;
+        $this->assertCartItemBelongsToCart($cartItem, $cart);
 
         try {
             $updateCartItemQuantityAction->execute(
@@ -87,6 +89,7 @@ class CartController extends Controller
         RemoveCartItemAction $removeCartItemAction,
     ): RedirectResponse {
         $cart = $guestCartResolver->resolve($request)->cart;
+        $this->assertCartItemBelongsToCart($cartItem, $cart);
 
         try {
             $removeCartItemAction->execute($cart, (int) $cartItem->getKey());
@@ -97,6 +100,13 @@ class CartController extends Controller
         return redirect()
             ->route('storefront.cart.show')
             ->with('cart_status', __('storefront.cart.removed'));
+    }
+
+    private function assertCartItemBelongsToCart(CartItem $cartItem, Cart $cart): void
+    {
+        if ((int) $cartItem->cart_id !== (int) $cart->getKey()) {
+            abort(404, __('storefront.cart.errors.item_not_found'));
+        }
     }
 
     private function handleCartMutationException(Request $request, CartMutationException $exception): RedirectResponse

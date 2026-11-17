@@ -10,6 +10,7 @@
 - The initial scope is one store. Do not introduce multi-tenancy or SaaS architecture unless explicitly requested.
 
 Before implementing a feature, read:
+- `docs/PROJECT_DECISIONS.md` — **when work affects product behavior, architecture, database design, security, domain responsibilities, checkout, cart, currency, localization, or project scope**
 - `docs/ARCHITECTURE.md`
 - `docs/DOMAIN_MAP.md`
 - `docs/PROJECT_ROADMAP.md`
@@ -319,9 +320,23 @@ Use the existing project structure when adding tests. Do not create unnecessary 
 
 ## 12. AI Agent Workflow
 
+### Project decision log (`docs/PROJECT_DECISIONS.md`)
+
+Every coding agent must:
+
+1. Read `docs/PROJECT_DECISIONS.md` before starting work that affects product behavior, architecture, database design, security, domain responsibilities, checkout, cart, currency, localization, or project scope.
+2. Treat decisions marked **Approved** in that log as authoritative.
+3. Never silently contradict or override an approved decision.
+4. If implementation requires changing an approved decision, **stop and ask the project owner for approval first**.
+5. After the owner approves a change, update `docs/PROJECT_DECISIONS.md` in the **same task/PR** as the implementation.
+6. Record the previous decision as **Superseded**, preserve its history, and add the replacement decision with its reason and date.
+7. Update the log when a new significant product, business, architecture, security, or technical decision is approved.
+8. Keep **Deferred**, **Open**, and **Inferred** decisions clearly distinguished from **Approved** decisions.
+9. Include relevant decision IDs (e.g. `CHECKOUT-003`, `AUTH-015`) in implementation reports when a task relies on or changes important decisions.
+
 Before implementing a feature:
 
-1. Read `AGENTS.md` and the relevant architecture documentation.
+1. Read `AGENTS.md`, `docs/PROJECT_DECISIONS.md` (when applicable per above), and the relevant architecture documentation.
 2. Inspect the existing implementation, related domains, routes, migrations, and tests.
 3. Identify the affected domains and their ownership boundaries.
 4. Identify security, authorization, data integrity, and performance implications.

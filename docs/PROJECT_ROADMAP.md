@@ -43,7 +43,7 @@ Phased implementation from foundation to production deployment. Adjust dates wit
 
 ## Phase 4 — Cart
 
-- Guest and authenticated carts
+- Guest and authenticated carts (implemented on feature branch — Milestone 9)
 - Add/update/remove lines; price snapshot rules
 - Cart APIs and minimal storefront cart actions
 
