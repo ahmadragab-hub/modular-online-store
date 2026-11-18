@@ -11,9 +11,9 @@ class CurrencySeeder extends Seeder
     {
         $rows = [
             [
-                'code' => 'USD',
-                'name' => 'US Dollar',
-                'symbol' => '$',
+                'code' => 'EGP',
+                'name' => 'Egyptian Pound',
+                'symbol' => 'E£',
                 'minor_units' => 2,
                 'is_base' => true,
                 'display_enabled' => true,
@@ -21,9 +21,9 @@ class CurrencySeeder extends Seeder
                 'sort_order' => 0,
             ],
             [
-                'code' => 'EGP',
-                'name' => 'Egyptian Pound',
-                'symbol' => 'E£',
+                'code' => 'USD',
+                'name' => 'US Dollar',
+                'symbol' => '$',
                 'minor_units' => 2,
                 'is_base' => false,
                 'display_enabled' => true,
@@ -37,7 +37,7 @@ class CurrencySeeder extends Seeder
                 'minor_units' => 3,
                 'is_base' => false,
                 'display_enabled' => true,
-                'transaction_enabled' => true,
+                'transaction_enabled' => false,
                 'sort_order' => 2,
             ],
         ];

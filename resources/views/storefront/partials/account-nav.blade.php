@@ -29,4 +29,14 @@
     >
         {{ __('storefront.account.nav.addresses') }}
     </a>
+    <a
+        href="{{ route('storefront.account.orders.index') }}"
+        @class([
+            'rounded-md px-3 py-1.5',
+            'bg-[var(--sf-accent)] text-[var(--sf-accent-text)]' => request()->routeIs('storefront.account.orders.*'),
+            'text-[var(--sf-muted)] hover:text-[var(--sf-text)]' => ! request()->routeIs('storefront.account.orders.*'),
+        ])
+    >
+        {{ __('storefront.account.nav.orders') }}
+    </a>
 </nav>

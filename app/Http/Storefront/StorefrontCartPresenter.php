@@ -6,6 +6,7 @@ use App\Domains\Cart\Models\Cart;
 use App\Domains\Cart\Models\CartItem;
 use App\Domains\Catalog\Support\ProductImageUrlResolver;
 use App\Domains\Store\Models\Currency;
+use App\Domains\Store\Models\StoreSetting;
 use App\Domains\Store\Queries\ResolveCurrentExchangeRateQuery;
 use App\Domains\Store\Services\CheckoutAmountConverter;
 use App\Shared\Support\MoneyMath;
@@ -47,8 +48,9 @@ final class StorefrontCartPresenter
         $minorUnits = $currency?->minor_units ?? 2;
         $symbol = $currency?->symbol ?? '$';
 
+        $baseCode = $this->catalogBaseCurrencyCode();
         $fx = $this->exchangeRateQuery->resolve($displayCode);
-        $fxAvailable = $fx['rate'] !== '' || $displayCode === 'USD';
+        $fxAvailable = $fx['rate'] !== '' || $displayCode === $baseCode;
         $amountsAreIndicative = true;
 
         $lines = [];
@@ -71,12 +73,13 @@ final class StorefrontCartPresenter
             $subtotalDisplay = MoneyMath::roundHalfUp($subtotalDisplay, $minorUnits);
         } elseif (! $fxAvailable) {
             $subtotalDisplay = $subtotalUsd;
-            $symbol = '$';
+            $baseCurrency = Currency::query()->find($baseCode);
+            $symbol = $baseCurrency?->symbol ?? 'E£';
         }
 
         return [
             'lines' => $lines,
-            'display_currency_code' => $fxAvailable ? $displayCode : 'USD',
+            'display_currency_code' => $fxAvailable ? $displayCode : $baseCode,
             'display_currency_symbol' => $symbol,
             'subtotal_display' => $this->formatMoney($subtotalDisplay, $minorUnits),
             'subtotal_base_usd' => $this->formatMoney($subtotalUsd, 2),
@@ -114,10 +117,12 @@ final class StorefrontCartPresenter
 
         $unitUsd = (string) $item->unit_price_base;
 
+        $baseCode = $this->catalogBaseCurrencyCode();
+
         if ($fxAvailable && $currency !== null) {
-            $unitDisplay = $displayCode === 'USD'
+            $unitDisplay = $displayCode === $baseCode
                 ? $unitUsd
-                : $this->amountConverter->convertUsdAmount($unitUsd, $currency, $exchangeRate);
+                : $this->amountConverter->convertBaseAmount($unitUsd, $currency, $exchangeRate);
             $lineDisplay = MoneyMath::multiply($unitDisplay, (string) $item->quantity, $minorUnits);
         } else {
             $unitDisplay = $unitUsd;
@@ -142,5 +147,12 @@ final class StorefrontCartPresenter
     private function formatMoney(string $amount, int $minorUnits): string
     {
         return StorefrontMoneyFormatter::format($amount, $minorUnits);
+    }
+
+    private function catalogBaseCurrencyCode(): string
+    {
+        return StoreSetting::singleton()?->base_currency_code
+            ?? Currency::query()->where('is_base', true)->value('code')
+            ?? 'EGP';
     }
 }

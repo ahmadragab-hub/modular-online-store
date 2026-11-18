@@ -15,6 +15,7 @@ use App\Domains\Orders\Models\Order;
 use App\Domains\Orders\Models\OrderItem;
 use App\Domains\Orders\Models\OrderStatusHistory;
 use App\Domains\Payments\Models\Payment;
+use App\Domains\Store\Models\CurrencyExchangeRate;
 use App\Domains\Store\Models\StoreSetting;
 use Database\Seeders\CurrencySeeder;
 use Database\Seeders\StoreLocaleSeeder;
@@ -119,22 +120,21 @@ class PlaceOrderActionTest extends TestCase
         $this->assertSame(hash('sha256', 'payment:'.$idempotencyKey.':attempt:1'), $payment->idempotency_key);
     }
 
-    public function test_frozen_currency_and_fx_on_egp_order(): void
+    public function test_frozen_currency_and_fx_on_usd_order(): void
     {
-        $this->seedRate('EGP', '48.50000000');
         ['variant' => $variant] = $this->createPublishedSellableVariant('100.00');
         $cart = $this->createGuestCartWithItem($variant);
 
         $result = $this->action->execute($this->placeOrderInput(
             $cart,
-            hash('sha256', 'egp-'.uniqid()),
-            currency: 'EGP',
+            hash('sha256', 'usd-'.uniqid()),
+            currency: 'USD',
         ));
 
         $order = Order::query()->whereKey($result->orderId)->firstOrFail();
-        $this->assertSame('USD', $order->base_currency_code);
-        $this->assertSame('EGP', $order->currency_code);
-        $this->assertSame('48.50000000', (string) $order->exchange_rate);
+        $this->assertSame('EGP', $order->base_currency_code);
+        $this->assertSame('USD', $order->currency_code);
+        $this->assertSame('0.02000000', (string) $order->exchange_rate);
         $this->assertNotNull($order->currency_exchange_rate_id);
     }
 
@@ -167,6 +167,8 @@ class PlaceOrderActionTest extends TestCase
 
     public function test_missing_fx_rejects_place_order(): void
     {
+        CurrencyExchangeRate::query()->where('quote_currency_code', 'USD')->delete();
+
         ['variant' => $variant] = $this->createPublishedSellableVariant();
         $cart = $this->createGuestCartWithItem($variant);
 
@@ -175,7 +177,7 @@ class PlaceOrderActionTest extends TestCase
         $this->action->execute($this->placeOrderInput(
             $cart,
             hash('sha256', 'fx-'.uniqid()),
-            currency: 'EGP',
+            currency: 'USD',
         ));
     }
 

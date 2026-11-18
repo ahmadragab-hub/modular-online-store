@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domains\Store\Models\CurrencyExchangeRate;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -16,8 +17,8 @@ class StoreSettingsSeeder extends Seeder
             'store_name' => 'Fashion Store',
             'contact_email' => 'contact@example.local',
             'contact_phone' => null,
-            'base_currency_code' => 'USD',
-            'default_display_currency_code' => 'USD',
+            'base_currency_code' => 'EGP',
+            'default_display_currency_code' => 'EGP',
             'timezone' => 'UTC',
             'address_line1' => null,
             'address_line2' => null,
@@ -30,7 +31,7 @@ class StoreSettingsSeeder extends Seeder
             'default_tax_rate' => null,
             'tax_configuration' => null,
             'shipping_enabled' => true,
-            'flat_shipping_amount' => null,
+            'flat_shipping_amount' => '0.00',
             'free_shipping_threshold' => null,
             'order_number_prefix' => 'ORD',
             'reservation_ttl_minutes' => 15,
@@ -45,5 +46,16 @@ class StoreSettingsSeeder extends Seeder
             ['id' => 1],
             $settings
         );
+
+        if (! CurrencyExchangeRate::query()->where('quote_currency_code', 'USD')->exists()) {
+            CurrencyExchangeRate::query()->create([
+                'quote_currency_code' => 'USD',
+                'rate' => '0.02000000',
+                'effective_from' => now()->subYear(),
+                'notes' => 'Seed USD per 1 EGP for development and tests.',
+                'created_by_user_id' => null,
+                'created_at' => $now,
+            ]);
+        }
     }
 }

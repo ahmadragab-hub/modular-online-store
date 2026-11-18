@@ -4,9 +4,11 @@ namespace Tests\Integration\MySQL;
 
 use App\Domains\Inventory\Actions\ExpireReservationsAction;
 use App\Domains\Inventory\DTOs\ExpireReservationsInput;
+use App\Domains\Inventory\Exceptions\ExpiredInventoryReservationException;
 use App\Domains\Inventory\Models\InventoryReservation;
 use App\Domains\Orders\Models\Order;
 use App\Domains\Payments\Actions\CompleteVerifiedPaymentSuccessAction;
+use App\Domains\Payments\Exceptions\PaymentOperationException;
 use App\Domains\Payments\Models\Payment;
 use Database\Seeders\CurrencySeeder;
 use Database\Seeders\StoreLocaleSeeder;
@@ -16,7 +18,7 @@ use Tests\Support\CreatesOrderPaymentFixtures;
 use Tests\TestCase;
 
 /**
- * Exercises payment success and expiry in alternating transactions under MySQL row locking.
+ * Payment success vs reservation expiry under MySQL row locking (ADMIN-006 §E, CHECKOUT-009).
  *
  * @group mysql
  */
@@ -36,7 +38,7 @@ class PaymentExpiryConcurrencyTest extends TestCase
         $this->seed([CurrencySeeder::class, StoreLocaleSeeder::class]);
     }
 
-    public function test_payment_success_then_expiry_on_same_order_does_not_leave_inconsistent_state(): void
+    public function test_payment_success_then_expiry_does_not_leave_inconsistent_state(): void
     {
         $variant = $this->createCatalogVariant();
         $order = $this->createUnpaidOrderWithLines(lines: [
@@ -47,11 +49,14 @@ class PaymentExpiryConcurrencyTest extends TestCase
         $successAction = $this->app->make(CompleteVerifiedPaymentSuccessAction::class);
         $expireAction = $this->app->make(ExpireReservationsAction::class);
 
+        DB::transaction(fn () => $successAction->execute((int) $payment->getKey(), 'mysql-prov'));
+
         InventoryReservation::query()->where('order_id', $order->getKey())
             ->update(['expires_at' => now()->subMinute()]);
 
-        DB::transaction(fn () => $successAction->execute((int) $payment->getKey(), 'mysql-prov'));
-        $expireAction->execute(new ExpireReservationsInput(batchLimit: 10));
+        $expireResult = $expireAction->execute(new ExpireReservationsInput(batchLimit: 10));
+
+        $this->assertSame(0, $expireResult->expiredCount);
 
         $order->refresh();
         $payment->refresh();
@@ -64,7 +69,7 @@ class PaymentExpiryConcurrencyTest extends TestCase
         );
     }
 
-    public function test_expiry_then_payment_success_on_still_valid_hold_completes(): void
+    public function test_late_payment_success_after_expiry_cancels_order_is_rejected(): void
     {
         $variant = $this->createCatalogVariant();
         $order = $this->createUnpaidOrderWithLines(lines: [
@@ -80,13 +85,48 @@ class PaymentExpiryConcurrencyTest extends TestCase
 
         $expireAction->execute(new ExpireReservationsInput(batchLimit: 10));
 
-        if ($order->fresh()->status === Order::STATUS_CANCELLED) {
-            $this->markTestSkipped('Hold expired before payment success attempt.');
+        $this->assertSame(Order::STATUS_CANCELLED, $order->fresh()->status);
+        $this->assertSame(
+            InventoryReservation::STATUS_EXPIRED,
+            InventoryReservation::query()->where('order_id', $order->getKey())->value('status'),
+        );
+
+        $this->expectException(PaymentOperationException::class);
+
+        try {
+            DB::transaction(fn () => $successAction->execute((int) $payment->getKey(), 'mysql-prov-late'));
+        } finally {
+            $this->assertSame(Order::STATUS_CANCELLED, $order->fresh()->status);
+            $this->assertSame(Payment::STATUS_CANCELLED, $payment->fresh()->status);
+            $this->assertNull($order->fresh()->paid_at);
         }
+    }
 
-        DB::transaction(fn () => $successAction->execute((int) $payment->getKey(), 'mysql-prov-2'));
+    public function test_payment_success_rejected_when_hold_past_ttl_under_mysql_locks(): void
+    {
+        $variant = $this->createCatalogVariant();
+        $order = $this->createUnpaidOrderWithLines(lines: [
+            ['variant' => $variant, 'quantity' => 1],
+        ]);
+        $payment = $this->createPaymentForOrder($order);
 
-        $this->assertSame(Order::STATUS_PROCESSING, $order->fresh()->status);
-        $this->assertSame(Payment::STATUS_CAPTURED, $payment->fresh()->status);
+        InventoryReservation::query()->where('order_id', $order->getKey())
+            ->update(['expires_at' => now()->subMinute()]);
+
+        $successAction = $this->app->make(CompleteVerifiedPaymentSuccessAction::class);
+
+        $this->expectException(ExpiredInventoryReservationException::class);
+
+        try {
+            DB::transaction(fn () => $successAction->execute((int) $payment->getKey(), 'mysql-prov-ttl'));
+        } finally {
+            $this->assertSame(Order::STATUS_PENDING_PAYMENT, $order->fresh()->status);
+            $this->assertNull($order->fresh()->paid_at);
+            $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+            $this->assertSame(
+                InventoryReservation::STATUS_ACTIVE,
+                InventoryReservation::query()->where('order_id', $order->getKey())->value('status'),
+            );
+        }
     }
 }

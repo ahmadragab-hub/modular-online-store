@@ -16,11 +16,13 @@ use Database\Seeders\StoreThemeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Support\BuildsCheckoutPlaceOrderFixtures;
+use Tests\Support\InteractsWithMockPayment;
 use Tests\TestCase;
 
 class CheckoutPlaceOrderHttpTest extends TestCase
 {
     use BuildsCheckoutPlaceOrderFixtures;
+    use InteractsWithMockPayment;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -108,7 +110,7 @@ class CheckoutPlaceOrderHttpTest extends TestCase
         $this->assertNotNull($order);
     }
 
-    public function test_successful_guest_checkout_redirects_to_success_page(): void
+    public function test_successful_guest_checkout_redirects_to_mock_payment_then_success_page(): void
     {
         ['variant' => $variant] = $this->createPublishedSellableVariant();
         $cart = $this->createGuestCartWithItem($variant);
@@ -119,7 +121,8 @@ class CheckoutPlaceOrderHttpTest extends TestCase
 
         $order = Order::query()->where('idempotency_key', $idempotencyKey)->first();
         $this->assertNotNull($order);
-        $response->assertRedirect(route('storefront.checkout.success', ['publicUuid' => $order->public_uuid]));
+        $this->assertCheckoutRedirectsToMockPayment($response);
+        $this->simulateMockPaymentSuccess($order);
         $this->get(route('storefront.checkout.success', ['publicUuid' => $order->public_uuid]))
             ->assertOk()
             ->assertSee($order->order_number, false);

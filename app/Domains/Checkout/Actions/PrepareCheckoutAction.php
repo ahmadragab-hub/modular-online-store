@@ -80,7 +80,7 @@ final class PrepareCheckoutAction
             $this->assertVariantPurchasable($variant, $item->quantity);
 
             $unitPriceBaseUsd = (string) $variant->price;
-            $unitPrice = $this->amountConverter->convertUsdAmount($unitPriceBaseUsd, $transactionCurrency, $fx['rate']);
+            $unitPrice = $this->amountConverter->convertBaseAmount($unitPriceBaseUsd, $transactionCurrency, $fx['rate']);
             $lineSubtotal = MoneyMath::multiply($unitPrice, (string) $item->quantity, $minorUnits);
             $lineSubtotalUsd = MoneyMath::multiply($unitPriceBaseUsd, (string) $item->quantity, 2);
             $subtotalBaseUsd = MoneyMath::add($subtotalBaseUsd, $lineSubtotalUsd, 2);
@@ -106,7 +106,7 @@ final class PrepareCheckoutAction
         $shippingTotalUsd = $this->resolveShippingUsd($settings, $subtotalBaseUsd);
         $shippingTotal = $shippingTotalUsd === '0.00'
             ? MoneyMath::roundHalfUp('0', $minorUnits)
-            : $this->amountConverter->convertUsdAmount($shippingTotalUsd, $transactionCurrency, $fx['rate']);
+            : $this->amountConverter->convertBaseAmount($shippingTotalUsd, $transactionCurrency, $fx['rate']);
 
         $taxTotal = MoneyMath::roundHalfUp('0', $minorUnits);
         $discountTotal = MoneyMath::roundHalfUp('0', $minorUnits);

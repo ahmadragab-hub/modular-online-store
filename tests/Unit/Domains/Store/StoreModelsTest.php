@@ -32,15 +32,18 @@ class StoreModelsTest extends TestCase
 
     public function test_currency_uses_code_primary_key_and_table(): void
     {
-        $currency = Currency::query()->find('USD');
+        $usd = Currency::query()->find('USD');
+        $egp = Currency::query()->find('EGP');
 
-        $this->assertNotNull($currency);
-        $this->assertSame('currencies', $currency->getTable());
-        $this->assertSame('code', $currency->getKeyName());
-        $this->assertFalse($currency->getIncrementing());
-        $this->assertSame('string', $currency->getKeyType());
-        $this->assertSame(2, $currency->minor_units);
-        $this->assertTrue($currency->is_base);
+        $this->assertNotNull($usd);
+        $this->assertNotNull($egp);
+        $this->assertSame('currencies', $egp->getTable());
+        $this->assertSame('code', $egp->getKeyName());
+        $this->assertFalse($egp->getIncrementing());
+        $this->assertSame('string', $egp->getKeyType());
+        $this->assertSame(2, $egp->minor_units);
+        $this->assertTrue($egp->is_base);
+        $this->assertFalse($usd->is_base);
     }
 
     public function test_store_locale_and_theme_use_string_primary_keys(): void
@@ -65,12 +68,12 @@ class StoreModelsTest extends TestCase
         $this->assertSame(StoreSetting::SINGLETON_ID, (int) $settings->getKey());
         $this->assertSame('store_settings', $settings->getTable());
         $this->assertFalse($settings->tax_enabled);
-        $this->assertSame('USD', $settings->base_currency_code);
+        $this->assertSame('EGP', $settings->base_currency_code);
         $this->assertSame('en', $settings->default_locale);
         $this->assertSame('light', $settings->default_theme);
 
         $this->assertInstanceOf(Currency::class, $settings->baseCurrency);
-        $this->assertSame('USD', $settings->baseCurrency->code);
+        $this->assertSame('EGP', $settings->baseCurrency->code);
         $this->assertInstanceOf(Currency::class, $settings->defaultDisplayCurrency);
         $this->assertInstanceOf(StoreLocale::class, $settings->defaultLocale);
         $this->assertInstanceOf(StoreTheme::class, $settings->defaultTheme);

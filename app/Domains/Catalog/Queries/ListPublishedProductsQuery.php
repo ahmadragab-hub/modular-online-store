@@ -16,6 +16,8 @@ final class ListPublishedProductsQuery
         string $locale,
         int $perPage = 24,
         ?int $page = null,
+        ?string $categorySlug = null,
+        ?string $searchTerm = null,
     ): LengthAwarePaginator {
         $perPage = max(1, min($perPage, 100));
 
@@ -24,12 +26,46 @@ final class ListPublishedProductsQuery
             ->orderByDesc('published_at')
             ->orderBy('id');
 
+        if ($searchTerm !== null && $searchTerm !== '') {
+            $this->applySearchTerm($query, $locale, $searchTerm);
+        }
+
+        if ($categorySlug !== null && $categorySlug !== '') {
+            $query->whereHas('categories', static function (Builder $categoryQuery) use ($categorySlug): void {
+                $categoryQuery
+                    ->where('slug', $categorySlug)
+                    ->where('is_active', true);
+            });
+        }
+
         $this->eagerLoadForStorefront($query, $locale);
 
         return $query->paginate(
             perPage: $perPage,
             page: $page ?? 1,
         );
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     */
+    private function applySearchTerm(Builder $query, string $locale, string $searchTerm): void
+    {
+        $normalized = mb_substr(trim($searchTerm), 0, 100);
+        if ($normalized === '') {
+            return;
+        }
+
+        $like = '%'.addcslashes($normalized, '%_\\').'%';
+
+        $query->whereHas('translations', static function (Builder $translationQuery) use ($locale, $like): void {
+            $translationQuery
+                ->where('locale', $locale)
+                ->where(static function (Builder $inner) use ($like): void {
+                    $inner->where('name', 'like', $like)
+                        ->orWhere('short_description', 'like', $like);
+                });
+        });
     }
 
     /**

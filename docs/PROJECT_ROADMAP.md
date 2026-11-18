@@ -60,11 +60,17 @@ Phased implementation from foundation to production deployment. Adjust dates wit
 
 ## Phase 6 — Payments
 
-- Gateway Contract + first driver (team selects provider)
-- Pay at checkout; failure paths with inventory release
-- Admin refund hook (basic)
+- Gateway Contract + first driver (**OPEN-001**, **OPEN-005**)
+- Post-commit initiation; webhook verification; retain Strategy C failure/retry semantics (**CHECKOUT-006–009**)
+- Admin payment visibility read-only (**ADMIN-007**); refunds **Deferred** (**PAY-004**)
 
 **Depends on:** Phase 5
+
+### Milestone 11 — Mock payment + EGP/USD checkout (**MVP complete**)
+
+**Delivered:** `PaymentGatewayContract`, `MockPaymentGateway`, post-commit `InitiatePaymentAction`, signed mock payment UI, storefront retry, EGP catalog base + EGP/USD checkout, read-only admin payment fields, tests ([MOCK_PAYMENT_IMPLEMENTATION_REPORT.md](MOCK_PAYMENT_IMPLEMENTATION_REPORT.md)).
+
+**Still open:** Real provider (**OPEN-001**), merchant jurisdiction (**OPEN-005**), production webhooks and stale reconciliation (**PAY-005–007**). Refunds (**PAY-004**), manual admin capture (**ADMIN-007**).
 
 ## Phase 7 — Storefront and admin UX
 
@@ -72,7 +78,7 @@ Phased implementation from foundation to production deployment. Adjust dates wit
 - **Milestone 10:** Admin dashboards and CRUD for catalog, orders, inventory, customers, store config ([STORE_ADMINISTRATION_PLAN.md](STORE_ADMINISTRATION_PLAN.md))
 - API parity for mobile/headless clients — deferred
 
-**Depends on:** Phase 6 (payments deferred; admin order UI read-only for capture until provider chosen)
+**Depends on:** Phase 5 for admin; payment capture remains provider-only until Milestone 11 ships
 
 ### Milestone 10 — Store Administration (consolidated)
 
@@ -82,12 +88,25 @@ Phased implementation from foundation to production deployment. Adjust dates wit
 
 ## Phase 8 — Hardening and deployment
 
-- Feature test coverage for Api/Web/Domains critical paths
-- Queue workers for notifications and async payment webhooks
-- CI pipeline, staging, production deploy runbook
-- Observability (logging, health checks including `/api/v1/health`)
+- Feature test coverage for Api/Web/Domains critical paths — **substantial Web/Unit coverage; API parity deferred**
+- Queue workers for notifications and async payment webhooks — **deferred until real provider**
+- CI pipeline, staging, production deploy runbook — **[DEPLOYMENT.md](DEPLOYMENT.md) added; CI not in repo**
+- Observability (logging, health checks including `/api/v1/health`) — **health endpoint present**
+- MySQL `@group mysql` concurrency tests — **authored; CI job `mysql-integration` in `.github/workflows/ci.yml`**
+- DB-013 one-active-cart MySQL constraint — **implemented** (2026-11-18)
+- Storefront catalog search — **implemented** (2026-11-18)
 
 **Depends on:** Phase 7
+
+## MVP status summary (2026-11-18)
+
+| Category | Status |
+| --- | --- |
+| Storefront + admin MVP | **Complete** (mock payment) |
+| Real payments | **Blocked** — OPEN-001, OPEN-005 |
+| MySQL concurrency proof | **Not run** in default PHPUnit (SQLite) |
+| Production deploy docs | **[DEPLOYMENT.md](DEPLOYMENT.md)** |
+| Full completion report | **[FINAL_MVP_COMPLETION_REPORT.md](FINAL_MVP_COMPLETION_REPORT.md)** |
 
 ## Diagram: phase flow
 

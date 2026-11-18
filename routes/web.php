@@ -7,7 +7,10 @@ use App\Http\Controllers\Web\Storefront\Auth\RegisterCustomerController;
 use App\Http\Controllers\Web\Storefront\CartController;
 use App\Http\Controllers\Web\Storefront\CheckoutController;
 use App\Http\Controllers\Web\Storefront\CustomerAddressController;
+use App\Http\Controllers\Web\Storefront\CustomerOrderController;
 use App\Http\Controllers\Web\Storefront\HomeController;
+use App\Http\Controllers\Web\Storefront\MockPaymentController;
+use App\Http\Controllers\Web\Storefront\OrderPaymentController;
 use App\Http\Controllers\Web\Storefront\PreferenceController;
 use App\Http\Controllers\Web\Storefront\ProductController;
 use App\Http\Controllers\Web\Storefront\ProfileController;
@@ -45,6 +48,10 @@ Route::middleware(ApplyStorefrontPreferences::class)->group(function (): void {
             ->name('addresses.default-shipping');
         Route::post('/addresses/{address}/default-billing', [CustomerAddressController::class, 'defaultBilling'])
             ->name('addresses.default-billing');
+        Route::get('/orders', [CustomerOrderController::class, 'index'])->name('orders.index');
+        Route::get('/orders/{publicUuid}', [CustomerOrderController::class, 'show'])
+            ->whereUuid('publicUuid')
+            ->name('orders.show');
     });
 
     Route::get('/', [HomeController::class, 'index'])->name('storefront.home');
@@ -61,6 +68,18 @@ Route::middleware(ApplyStorefrontPreferences::class)->group(function (): void {
     Route::post('/checkout', [CheckoutController::class, 'store'])->name('storefront.checkout.store');
     Route::get('/checkout/success/{publicUuid}', [CheckoutController::class, 'success'])
         ->name('storefront.checkout.success');
+
+    Route::post('/orders/{publicUuid}/payments/retry', [OrderPaymentController::class, 'retry'])
+        ->name('storefront.orders.payments.retry');
+
+    Route::get('/payments/mock/{payment}', [MockPaymentController::class, 'show'])
+        ->name('storefront.payments.mock.show');
+
+    Route::post('/payments/mock/{payment}/success', [MockPaymentController::class, 'success'])
+        ->name('storefront.payments.mock.success');
+
+    Route::post('/payments/mock/{payment}/failure', [MockPaymentController::class, 'failure'])
+        ->name('storefront.payments.mock.failure');
 
     Route::post('/preferences/locale', [PreferenceController::class, 'locale'])->name('storefront.locale');
     Route::post('/preferences/theme', [PreferenceController::class, 'theme'])->name('storefront.theme');

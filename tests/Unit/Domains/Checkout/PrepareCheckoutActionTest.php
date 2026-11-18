@@ -194,18 +194,18 @@ class PrepareCheckoutActionTest extends TestCase
         ));
 
         $this->assertSame('USD', $result->transactionCurrencyCode);
-        $this->assertSame('1.00000000', $result->exchangeRate);
-        $this->assertNull($result->currencyExchangeRateId);
-        $this->assertSame('100.00', $result->lines[0]->unitPrice);
-        $this->assertSame('100.00', $result->subtotal);
-        $this->assertSame('100.00', $result->grandTotal);
+        $this->assertSame('EGP', $result->baseCurrencyCode);
+        $this->assertSame('0.02000000', $result->exchangeRate);
+        $this->assertNotNull($result->currencyExchangeRateId);
+        $this->assertSame('2.00', $result->lines[0]->unitPrice);
+        $this->assertSame('2.00', $result->subtotal);
+        $this->assertSame('2.00', $result->grandTotal);
         $this->assertFalse($result->taxEnabled);
         $this->assertSame('0.00', $result->taxTotal);
     }
 
-    public function test_valid_egp_checkout_with_fx_rate(): void
+    public function test_valid_egp_checkout_without_fx_conversion(): void
     {
-        $this->seedRate('EGP', '48.50000000');
         ['variant' => $variant] = $this->createPublishedSellableVariant('100.00');
         $cart = $this->createGuestCartWithItem($variant);
 
@@ -215,29 +215,36 @@ class PrepareCheckoutActionTest extends TestCase
             sessionToken: $this->sessionTokenForCart($cart),
         ));
 
-        $this->assertSame('4850.00', $result->lines[0]->unitPrice);
-        $this->assertSame('4850.00', $result->subtotal);
-        $this->assertNotNull($result->currencyExchangeRateId);
+        $this->assertSame('100.00', $result->lines[0]->unitPrice);
+        $this->assertSame('100.00', $result->subtotal);
+        $this->assertSame('1.00000000', $result->exchangeRate);
+        $this->assertNull($result->currencyExchangeRateId);
     }
 
-    public function test_valid_kwd_checkout_three_decimal_rounding(): void
+    public function test_disabled_transaction_currency_rejected(): void
     {
-        $this->seedRate('KWD', '0.30700000');
         ['variant' => $variant] = $this->createPublishedSellableVariant('10.00');
         $cart = $this->createGuestCartWithItem($variant);
 
-        $result = $this->action->execute(new PrepareCheckoutInput(
-            cartId: $cart->getKey(),
-            transactionCurrencyCode: 'KWD',
-            sessionToken: $this->sessionTokenForCart($cart),
-        ));
+        $this->expectException(CheckoutPreparationException::class);
 
-        $this->assertSame('3.070', $result->lines[0]->unitPrice);
-        $this->assertSame('3.070', $result->subtotal);
+        try {
+            $this->action->execute(new PrepareCheckoutInput(
+                cartId: $cart->getKey(),
+                transactionCurrencyCode: 'KWD',
+                sessionToken: $this->sessionTokenForCart($cart),
+            ));
+        } catch (CheckoutPreparationException $e) {
+            $this->assertSame(CheckoutPreparationException::CURRENCY_NOT_TRANSACTION_ENABLED, $e->errorCode);
+
+            throw $e;
+        }
     }
 
-    public function test_missing_fx_rate_blocks_non_usd(): void
+    public function test_missing_fx_rate_blocks_usd(): void
     {
+        CurrencyExchangeRate::query()->where('quote_currency_code', 'USD')->delete();
+
         ['variant' => $variant] = $this->createPublishedSellableVariant();
         $cart = $this->createGuestCartWithItem($variant);
 
@@ -247,7 +254,7 @@ class PrepareCheckoutActionTest extends TestCase
         try {
             $this->action->execute(new PrepareCheckoutInput(
                 cartId: $cart->getKey(),
-                transactionCurrencyCode: 'EGP',
+                transactionCurrencyCode: 'USD',
                 sessionToken: $this->sessionTokenForCart($cart),
             ));
         } catch (CheckoutPreparationException $e) {
@@ -448,10 +455,10 @@ class PrepareCheckoutActionTest extends TestCase
         ));
 
         $this->assertSame('75.00', $result->lines[0]->unitPriceBaseUsd);
-        $this->assertSame('75.00', $result->lines[0]->unitPrice);
+        $this->assertSame('1.50', $result->lines[0]->unitPrice);
     }
 
-    public function test_shipping_flat_usd_converted_to_transaction_currency(): void
+    public function test_shipping_flat_base_amount_converted_to_transaction_currency(): void
     {
         StoreSetting::query()->whereKey(StoreSetting::SINGLETON_ID)->update([
             'shipping_enabled' => true,
@@ -459,7 +466,6 @@ class PrepareCheckoutActionTest extends TestCase
             'free_shipping_threshold' => null,
         ]);
 
-        $this->seedRate('EGP', '48.50000000');
         ['variant' => $variant] = $this->createPublishedSellableVariant('20.00');
         $cart = $this->createGuestCartWithItem($variant);
 
@@ -469,11 +475,11 @@ class PrepareCheckoutActionTest extends TestCase
             sessionToken: $this->sessionTokenForCart($cart),
         ));
 
-        $this->assertSame('485.00', $result->shippingTotal);
-        $this->assertSame('1455.00', $result->grandTotal);
+        $this->assertSame('10.00', $result->shippingTotal);
+        $this->assertSame('30.00', $result->grandTotal);
     }
 
-    public function test_free_shipping_threshold_in_usd(): void
+    public function test_free_shipping_threshold_in_base_currency(): void
     {
         StoreSetting::query()->whereKey(StoreSetting::SINGLETON_ID)->update([
             'shipping_enabled' => true,
@@ -491,7 +497,7 @@ class PrepareCheckoutActionTest extends TestCase
         ));
 
         $this->assertSame('0.00', $result->shippingTotal);
-        $this->assertSame('100.00', $result->grandTotal);
+        $this->assertSame('2.00', $result->grandTotal);
     }
 
     public function test_cart_ownership_for_registered_customer(): void
@@ -540,13 +546,13 @@ class PrepareCheckoutActionTest extends TestCase
 
     public function test_money_amounts_are_decimal_strings_not_floats(): void
     {
-        $this->seedRate('KWD', '0.33300000');
+        $this->seedRate('USD', '0.33300000');
         ['variant' => $variant] = $this->createPublishedSellableVariant('10.00');
         $cart = $this->createGuestCartWithItem($variant);
 
         $result = $this->action->execute(new PrepareCheckoutInput(
             cartId: $cart->getKey(),
-            transactionCurrencyCode: 'KWD',
+            transactionCurrencyCode: 'USD',
             sessionToken: $this->sessionTokenForCart($cart),
         ));
 
@@ -555,7 +561,7 @@ class PrepareCheckoutActionTest extends TestCase
             $this->assertMatchesRegularExpression('/^\d+(\.\d+)?$/', $amount);
         }
 
-        $this->assertSame('3.330', $result->lines[0]->unitPrice);
+        $this->assertSame('3.33', $result->lines[0]->unitPrice);
     }
 
     public function test_shipping_enabled_without_flat_rate_rejects_preparation(): void
@@ -601,7 +607,7 @@ class PrepareCheckoutActionTest extends TestCase
         ));
 
         $this->assertSame('0.00', $result->shippingTotal);
-        $this->assertSame('25.00', $result->grandTotal);
+        $this->assertSame('0.50', $result->grandTotal);
     }
 
     public function test_insufficient_stock_rejected(): void
@@ -724,7 +730,7 @@ class PrepareCheckoutActionTest extends TestCase
         ));
 
         $this->assertSame('0.00', $result->shippingTotal);
-        $this->assertSame('50.00', $result->grandTotal);
+        $this->assertSame('1.00', $result->grandTotal);
     }
 
     public function test_quantity_greater_than_one_line_subtotal(): void
@@ -739,9 +745,9 @@ class PrepareCheckoutActionTest extends TestCase
         ));
 
         $this->assertSame(3, $result->lines[0]->quantity);
-        $this->assertSame('10.00', $result->lines[0]->unitPrice);
-        $this->assertSame('30.00', $result->lines[0]->lineSubtotal);
-        $this->assertSame('30.00', $result->subtotal);
+        $this->assertSame('0.20', $result->lines[0]->unitPrice);
+        $this->assertSame('0.60', $result->lines[0]->lineSubtotal);
+        $this->assertSame('0.60', $result->subtotal);
     }
 
     public function test_failed_preparation_does_not_mutate_persisted_state(): void

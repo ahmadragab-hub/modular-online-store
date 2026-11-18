@@ -8,7 +8,7 @@ Prioritization for the **first usable** single-store fashion release. Schema in 
 
 ### Store & identity
 
-- [ ] `store_settings` seeded (`base_currency_code` = USD, `tax_enabled` = 0 until jurisdiction known)
+- [x] `store_settings` seeded (`base_currency_code` = **EGP**, `tax_enabled` = 0 until jurisdiction known)
 - [ ] `currencies` seeded (USD, EGP, KWD with correct `minor_units`)
 - [ ] `currency_exchange_rates` admin insert-only (USD→EGP, USD→KWD)
 - [ ] `store_locales` (`en`, `ar`) and `store_themes` (`light`, `dark`)
@@ -25,9 +25,9 @@ Prioritization for the **first usable** single-store fashion release. Schema in 
 - [ ] Products CRUD (draft/publish)
 - [ ] **`product_translations`** — **both `en` and `ar` required to publish**
 - [ ] Global `sizes`, `colors`
-- [ ] Product variants with unique SKU and **USD** price
+- [x] Product variants with unique SKU and **EGP** (catalog base) price
 - [ ] Product images (disk path storage)
-- [ ] Storefront browse: category, product detail (locale from Store preference)
+- [x] Storefront browse: category filter, product search (`q`), product detail (locale from Store preference)
 
 ### Inventory
 
@@ -47,7 +47,7 @@ Prioritization for the **first usable** single-store fashion release. Schema in 
 ### Cart
 
 - [ ] Guest cart (`session_token`) and authenticated cart
-- [ ] Add/update/remove lines with USD snapshots (`unit_price_base`)
+- [x] Add/update/remove lines with catalog-base snapshots (`unit_price_base`)
 - [ ] `display_currency_code` on cart; converted totals for UI only
 - [ ] Merge cart on login (basic)
 
@@ -57,15 +57,15 @@ Prioritization for the **first usable** single-store fashion release. Schema in 
 - [ ] `orders.idempotency_key`, `orders.public_uuid` (no `checkout_sessions` table)
 - [ ] Orders with immutable snapshots + frozen FX and transaction currency
 - [ ] `order_status_histories` including `payment_failed`
-- [ ] Customer order list (authenticated); order confirmation page
+- [x] Customer order list (authenticated); order confirmation page (guest confirmation via `public_uuid` URL)
 - [ ] Admin order list + status update (`processing` → `shipped` → `delivered`)
 
 ### Payments
 
-- [ ] Payment provider (team choice) via `PaymentGatewayContract` — must support selected transaction currencies
-- [ ] `payments`, `payment_provider_events`
-- [ ] Redirect/hosted checkout; verified webhooks; idempotency
-- [ ] **`payment_failed`** + retry on same order while reservation active
+- [x] **Mock** provider via `PaymentGatewayContract` (MVP); real provider **OPEN-001**
+- [x] `payments`, `payment_provider_events` (schema + mock flow)
+- [x] Redirect mock checkout; authoritative success/failure Actions; idempotency — **webhooks deferred** until real provider
+- [x] **`payment_failed`** + retry on same order while reservation active
 - [ ] **No** stored card data
 
 ### Delivery
@@ -133,7 +133,7 @@ Prioritization for the **first usable** single-store fashion release. Schema in 
 
 | Decision | Resolution |
 | --- | --- |
-| Multi-currency | USD base; USD/EGP/KWD; manual rates; immutable snapshots |
+| Multi-currency | **EGP** catalog base; payment **EGP/USD**; display USD/EGP/KWD; manual rates; immutable snapshots |
 | `minor_units` | USD 2, EGP 2, KWD 3 from `currencies` |
 | FX rounding | Decimal math; half-up per component |
 | Checkout | Strategy C; no provider HTTP inside DB transactions |
@@ -148,7 +148,7 @@ Prioritization for the **first usable** single-store fashion release. Schema in 
 
 | # | Topic | Notes |
 | --- | --- | --- |
-| 1 | Payment provider | Must support charge currencies offered at checkout |
+| 1 | Payment provider | Must support charge currencies offered at checkout; blocked by merchant jurisdiction (**OPEN-005** — [PAYMENT_PROVIDER_EVALUATION.md](PAYMENT_PROVIDER_EVALUATION.md)) |
 | 2 | API auth | Session vs Sanctum |
 | 3 | Tier 1 API breadth | Web-first vs full API checkout |
 | 4 | Tax jurisdiction | Business input — blocks enabling `tax_enabled` |

@@ -8,6 +8,7 @@ use App\Domains\Customers\Models\Customer;
 use App\Domains\Identity\Models\User;
 use App\Domains\Store\Models\Currency;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 final class GetOrCreateCustomerCartAction
@@ -52,17 +53,34 @@ final class GetOrCreateCustomerCartAction
             return $cart->fresh();
         }
 
-        $baseCurrencyCode = Currency::query()->where('is_base', true)->value('code') ?? 'USD';
+        $baseCurrencyCode = Currency::query()->where('is_base', true)->value('code') ?? 'EGP';
 
-        return Cart::query()->create([
-            'customer_id' => $customer->getKey(),
-            'user_id' => $user->getKey(),
-            'session_token' => null,
-            'display_currency_code' => $displayCurrencyCode,
-            'base_currency_code' => $baseCurrencyCode,
-            'status' => Cart::STATUS_ACTIVE,
-            'expires_at' => null,
-        ]);
+        try {
+            return Cart::query()->create([
+                'customer_id' => $customer->getKey(),
+                'user_id' => $user->getKey(),
+                'session_token' => null,
+                'display_currency_code' => $displayCurrencyCode,
+                'base_currency_code' => $baseCurrencyCode,
+                'status' => Cart::STATUS_ACTIVE,
+                'expires_at' => null,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            /** @var Cart|null $existing */
+            $existing = Cart::query()
+                ->where('customer_id', $customer->getKey())
+                ->where('status', Cart::STATUS_ACTIVE)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing === null) {
+                throw new MultipleActiveCustomerCartsException([]);
+            }
+
+            $this->syncOwnershipAndCurrency($existing, $customer, $user, $displayCurrencyCode);
+
+            return $existing->fresh();
+        }
     }
 
     private function syncOwnershipAndCurrency(

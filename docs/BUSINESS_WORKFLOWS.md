@@ -6,18 +6,18 @@ End-to-end flows for the fashion store MVP, including **transaction boundaries**
 
 | Topic | Rule |
 | --- | --- |
-| Base / catalog prices | **USD** on `product_variants.price` |
-| Supported currencies | **USD**, **EGP**, **KWD** |
-| Exchange rates | Admin-managed manual rows (`currency_exchange_rates`); quote per 1 USD |
+| Base / catalog prices | **EGP** on `product_variants.price` |
+| Payment currencies (MVP) | **EGP**, **USD** at checkout; **KWD** display-only unless re-enabled |
+| Exchange rates | Admin-managed manual rows (`currency_exchange_rates`); quote per 1 **EGP** |
 | Display | Customer selects **display currency** for browsing (cart UI, PLP/PDP); independent of payment |
 | Checkout | Customer selects **transaction currency** explicitly (`transaction_enabled`) |
 | Orders / payments | Persist amounts in **transaction currency** + frozen `exchange_rate`; never updated when rates change |
-| Shipping / tax baselines | Stored in USD on `store_settings`, converted at checkout using the **same order rate** |
+| Shipping / tax baselines | Stored in **EGP** on `store_settings`, converted at checkout using the **same order rate** |
 | Historical immutability | Never recompute past orders when rates or defaults change |
 
 ### Exchange-rate and rounding policy (MVP default)
 
-- **Rate direction:** `currency_exchange_rates.rate` = quote currency units per **1 USD**.
+- **Rate direction:** `currency_exchange_rates.rate` = quote currency units per **1 EGP**.
 - **Source of truth at checkout:** Server loads current rate for the selected **transaction currency**; missing rate blocks checkout for that currency.
 - **Rounding:** **Half-up** to `currencies.minor_units` for each converted component (line subtotals, tax, shipping). Order `grand_total` is the sum of rounded components in **transaction currency**—not a silent re-round of the USD total.
 - **Snapshots:** Store `orders.exchange_rate`, `orders.currency_code`, and all charge amounts on the order and on `payments` / `refunds`.
@@ -54,8 +54,8 @@ This is the **default target** for a single-store MVP with manual FX and hosted/
    - **Orders:** `CreatePendingOrderAction` — `pending_payment`, frozen `currency_code`, `exchange_rate`, line snapshots.
    - **Inventory:** `ReserveStockAction` per line, `order_id`, `expires_at` from store TTL.
    - **Payments:** insert **pending** `payments` row matching order amount/currency (record only).
-6. **After transaction commits:** `InitiatePaymentAction` invokes the **payment provider** (HTTP) and returns redirect/session data to the **HTTP controller** (DTO—not a view).
-7. On **verified success** (return URL signature check and/or idempotent webhook):
+6. **After transaction commits:** `InitiatePaymentAction` invokes the **payment provider** (HTTP) and returns redirect/session data to the **HTTP controller** (DTO—not a view). **Implementation status:** place order and pending payment row exist; initiation and provider HTTP are **Milestone 11** ([PAYMENT_PROVIDER_INTEGRATION_PLAN.md](PAYMENT_PROVIDER_INTEGRATION_PLAN.md)).
+7. On **verified success** (return URL signature check and/or idempotent webhook), domain code calls **`CompleteVerifiedPaymentSuccessAction`** (implemented) — never trust browser redirect alone:
    - **New DB transaction:** mark payment captured, order → `processing`, `CommitReservationAction` (cart already `converted` at placement — **CHECKOUT-014**).
 8. On **verified payment failure:** `RecordPaymentFailureAction`, order → **`payment_failed`**; **keep** reservations for retry (**CHECKOUT-006**). **Do not** release on ordinary failure. Release only on **explicit cancellation** or **TTL expiry** (**ADMIN-006**).
 9. **Scheduled job:** `ExpireReservationsJob` — release stock, cancel or expire stale `pending_payment` orders.

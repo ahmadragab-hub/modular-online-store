@@ -8,6 +8,7 @@ use App\Domains\Catalog\Models\ProductVariant;
 use App\Domains\Catalog\Support\ProductImageUrlResolver;
 use App\Domains\Inventory\Queries\GetAvailableQuantityForVariantsQuery;
 use App\Domains\Store\Models\Currency;
+use App\Domains\Store\Models\StoreSetting;
 use App\Domains\Store\Queries\ResolveCurrentExchangeRateQuery;
 use App\Domains\Store\Services\CheckoutAmountConverter;
 use App\Shared\Support\MoneyMath;
@@ -154,12 +155,14 @@ final class StorefrontCatalogPresenter
     {
         $displayCurrencyCode = strtoupper(trim($displayCurrencyCode));
         $currency = Currency::query()->find($displayCurrencyCode);
+        $baseCode = $this->catalogBaseCurrencyCode();
+        $baseCurrency = Currency::query()->find($baseCode);
         $fx = $this->exchangeRateQuery->resolve($displayCurrencyCode);
-        $fxAvailable = $fx['rate'] !== '' || $displayCurrencyCode === 'USD';
+        $fxAvailable = $fx['rate'] !== '' || $displayCurrencyCode === $baseCode;
 
         return [
-            'currency_code' => $fxAvailable ? $displayCurrencyCode : 'USD',
-            'symbol' => $fxAvailable ? ($currency?->symbol ?? '$') : '$',
+            'currency_code' => $fxAvailable ? $displayCurrencyCode : $baseCode,
+            'symbol' => $fxAvailable ? ($currency?->symbol ?? '$') : ($baseCurrency?->symbol ?? 'E£'),
             'fx_available' => $fxAvailable,
             'minor_units' => $fxAvailable && $currency !== null ? $currency->minor_units : 2,
         ];
@@ -174,18 +177,23 @@ final class StorefrontCatalogPresenter
         $currency = Currency::query()->find($displayCurrencyCode);
         $fx = $this->exchangeRateQuery->resolve($displayCurrencyCode);
 
+        $baseCode = $this->catalogBaseCurrencyCode();
+        $baseCurrency = Currency::query()->find($baseCode);
+
         if (! $context['fx_available'] || $currency === null) {
+            $minorUnits = $baseCurrency?->minor_units ?? 2;
+
             return [
-                'formatted_amount' => StorefrontMoneyFormatter::format($amountUsd, 2),
-                'currency_code' => 'USD',
-                'symbol' => '$',
+                'formatted_amount' => StorefrontMoneyFormatter::format($amountUsd, $minorUnits),
+                'currency_code' => $baseCode,
+                'symbol' => $baseCurrency?->symbol ?? 'E£',
                 'fx_available' => false,
             ];
         }
 
-        $converted = $displayCurrencyCode === 'USD'
+        $converted = $displayCurrencyCode === $baseCode
             ? $amountUsd
-            : $this->amountConverter->convertUsdAmount($amountUsd, $currency, $fx['rate']);
+            : $this->amountConverter->convertBaseAmount($amountUsd, $currency, $fx['rate']);
 
         return [
             'formatted_amount' => StorefrontMoneyFormatter::format($converted, $currency->minor_units),
@@ -193,6 +201,13 @@ final class StorefrontCatalogPresenter
             'symbol' => $currency->symbol,
             'fx_available' => true,
         ];
+    }
+
+    private function catalogBaseCurrencyCode(): string
+    {
+        return StoreSetting::singleton()?->base_currency_code
+            ?? Currency::query()->where('is_base', true)->value('code')
+            ?? 'EGP';
     }
 
     private function requireTranslation(Product $product): ProductTranslation

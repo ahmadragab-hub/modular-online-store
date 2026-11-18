@@ -42,6 +42,11 @@
                 <a href="{{ route('storefront.account.addresses.index') }}" class="rounded-lg border border-[var(--sf-border)] px-4 py-2 text-sm font-medium text-[var(--sf-text)]">
                     {{ __('storefront.account.dashboard.manage_addresses') }}
                 </a>
+                @if ($orderCount > 0)
+                    <a href="{{ route('storefront.account.orders.index') }}" class="rounded-lg border border-[var(--sf-border)] px-4 py-2 text-sm font-medium text-[var(--sf-text)]">
+                        {{ __('storefront.account.dashboard.view_orders') }}
+                    </a>
+                @endif
             </div>
         </div>
     </main>

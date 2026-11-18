@@ -149,7 +149,7 @@ trait BuildsCheckoutPlaceOrderFixtures
     protected function placeOrderInput(
         Cart $cart,
         string $idempotencyKey,
-        string $currency = 'USD',
+        string $currency = 'EGP',
         ?string $guestEmail = 'guest@example.com',
         ?int $userId = null,
         ?string $billingCity = 'Cairo',
