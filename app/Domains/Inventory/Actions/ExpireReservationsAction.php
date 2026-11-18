@@ -11,6 +11,9 @@ use App\Domains\Inventory\Exceptions\RequiresActiveDatabaseTransactionException;
 use App\Domains\Inventory\Models\InventoryLevel;
 use App\Domains\Inventory\Models\InventoryMovement;
 use App\Domains\Inventory\Models\InventoryReservation;
+use App\Domains\Orders\Actions\CancelUnpaidOrderWhenHoldsClearedAction;
+use App\Domains\Orders\Models\Order;
+use App\Shared\Support\OrderScopedPaymentLocks;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +23,8 @@ use Illuminate\Support\Facades\Log;
  * Expires active reservations whose TTL has passed.
  *
  * Lock order per reservation (compatible with reserve/commit/release):
- * Cart (when present) → reservation row → inventory level.
+ * For order-linked holds: Order → Payment rows (ascending id) → Cart (ascending id when present) → reservation → inventory level.
+ * Cart-only holds: Cart (when present) → reservation → inventory level.
  *
  * Each reservation is processed in its own transaction when no caller transaction is active.
  */
@@ -29,6 +33,10 @@ final class ExpireReservationsAction
     private const OUTCOME_EXPIRED = 'expired';
 
     private const OUTCOME_SKIPPED = 'skipped';
+
+    public function __construct(
+        private readonly CancelUnpaidOrderWhenHoldsClearedAction $cancelUnpaidOrderWhenHoldsClearedAction,
+    ) {}
 
     public function execute(ExpireReservationsInput $input): ExpireReservationsResult
     {
@@ -66,8 +74,10 @@ final class ExpireReservationsAction
                 }
             } catch (\Throwable $exception) {
                 $failedIds[] = (int) $reservationId;
+                $orderId = InventoryReservation::query()->whereKey($reservationId)->value('order_id');
                 Log::warning('inventory.reservation.expire_failed', [
                     'reservation_id' => $reservationId,
+                    'order_id' => $orderId,
                     'message' => $exception->getMessage(),
                 ]);
             }
@@ -90,7 +100,7 @@ final class ExpireReservationsAction
             return $this->expireOne($reservationId, $asOf);
         }
 
-        return DB::transaction(fn (): string => $this->expireOne($reservationId, $asOf));
+        return DB::transaction(fn (): string => $this->expireOne($reservationId, $asOf), 3);
     }
 
     private function expireOne(int $reservationId, CarbonInterface $asOf): string
@@ -103,6 +113,24 @@ final class ExpireReservationsAction
 
         if ($reservationStub === null) {
             return self::OUTCOME_SKIPPED;
+        }
+
+        if ($reservationStub->order_id !== null) {
+            /** @var Order|null $order */
+            $order = Order::query()->whereKey($reservationStub->order_id)->lockForUpdate()->first();
+
+            if ($order === null) {
+                return self::OUTCOME_SKIPPED;
+            }
+
+            OrderScopedPaymentLocks::lockForOrder((int) $order->getKey());
+
+            if (! in_array($order->status, [
+                Order::STATUS_PENDING_PAYMENT,
+                Order::STATUS_PAYMENT_FAILED,
+            ], true)) {
+                return self::OUTCOME_SKIPPED;
+            }
         }
 
         if ($reservationStub->cart_id !== null) {
@@ -177,6 +205,10 @@ final class ExpireReservationsAction
             'created_by_user_id' => null,
             'created_at' => now(),
         ]);
+
+        if ($reservation->order_id !== null) {
+            $this->cancelUnpaidOrderWhenHoldsClearedAction->execute((int) $reservation->order_id);
+        }
 
         return self::OUTCOME_EXPIRED;
     }

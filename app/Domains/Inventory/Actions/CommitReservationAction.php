@@ -14,6 +14,7 @@ use App\Domains\Inventory\Exceptions\RequiresActiveDatabaseTransactionException;
 use App\Domains\Inventory\Models\InventoryLevel;
 use App\Domains\Inventory\Models\InventoryMovement;
 use App\Domains\Inventory\Models\InventoryReservation;
+use App\Domains\Orders\Actions\MarkOrderPaidAction;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -23,6 +24,9 @@ use Illuminate\Support\Facades\DB;
  * 1. {@see Cart} row when `cart_id` is set (`lockForUpdate`)
  * 2. {@see InventoryReservation} row (`lockForUpdate`)
  * 3. {@see InventoryLevel} for the variant (`lockForUpdate`)
+ *
+ * Order-scoped callers ({@see MarkOrderPaidAction}) must lock all
+ * relevant carts (ascending id) before locking reservations for the order.
  */
 final class CommitReservationAction
 {

@@ -45,11 +45,12 @@
 
 ## N. Current project position
 
-| Item | Verified state (2026-11-16) |
+| Item | Verified state (2026-11-17) |
 | --- | --- |
 | **Stable branch** | `main` at `5b18d1f` (merge of PR #8) |
-| **Current branch** | `feature/customer-authentication-and-accounts` (planning / in progress; **not merged**) |
-| **Milestone 9 status** | **Implemented on feature branch** — auth (9.1), cart merge, profile, addresses, storefront integration |
+| **Current branch** | `feature/store-administration` (Milestone 10 planning) |
+| **Milestone 9 status** | **Implemented** — customer auth, cart merge, profile, addresses (see branch history / merge state) |
+| **Milestone 10 status** | **Planned** — store administration (see [STORE_ADMINISTRATION_PLAN.md](STORE_ADMINISTRATION_PLAN.md)) |
 
 ### Merged milestones (Git)
 
@@ -66,13 +67,14 @@
 
 ### Milestone 9 implementation sequence (Approved)
 
-1. **9.1** Authentication — **done** (feature branch)
-2. **9.2–9.4** Authenticated cart, guest-cart merge, profile, addresses, storefront integration — **done** (consolidated implementation on feature branch)
+1. **9.1–9.4** Customer accounts — **done** (consolidated)
+2. **10** Store administration — **planned** (admin UI; domain Actions for catalog/inventory/order admin)
 
 ### Current implementation facts (not milestones)
 
 - Storefront: guest cart, shop/PDP, checkout placement (`PlaceOrderAction`, inventory reservation, pending order/payment rows).
-- Customer registration/login: **not** on `main`.
+- Customer registration/login: implemented on feature work (**Milestone 9**); verify merge state on `main`.
+- Admin UI: **not implemented** (Milestone 10 planning).
 - Payment provider HTTP, webhooks, and post-commit `InitiatePaymentAction`: **not** wired on `main` (design approved; integration **Deferred**).
 - API v1: health endpoint only.
 
@@ -245,7 +247,8 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 | CHECKOUT-002 | **No** payment provider HTTP inside DB transaction | Approved |
 | CHECKOUT-003 | Provider call **after** transaction commits | Approved |
 | CHECKOUT-004 | Verified callbacks determine payment outcome | Approved |
-| CHECKOUT-005 | Success: confirm order, commit reservation, convert cart | Approved |
+| CHECKOUT-005 | Success: confirm order (`processing`), commit reservation | Approved |
+| CHECKOUT-014 | Cart `converted` at order placement (not on payment success) | Approved |
 | CHECKOUT-006 | Payment failure: order `payment_failed`; **do not** release reservation immediately | Approved |
 | CHECKOUT-007 | Retry payment on same order while reservation active | Approved |
 | CHECKOUT-008 | Release reservation on cancellation or TTL expiry | Approved |
@@ -266,6 +269,13 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 - **Status:** Approved (Milestone 9)
 - **Statement:** Do not redesign `PlaceOrderAction`, checkout idempotency, or reservation behavior for customer accounts.
 - **Date:** 2026-11-16.
+
+**CHECKOUT-014 — Cart conversion at order placement**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** The shopping cart transitions to **`converted`** inside the same database transaction as successful **`PlaceOrderAction`** (order placement), not on payment success. Retain current `PlaceOrderAction` behavior. Payment success must **not** require `MarkCartConvertedAction` for checkout to complete (handler may no-op if cart already `converted`).
+- **References:** **ADMIN-006** (approved lifecycle); `PlaceOrderAction` implementation.
+- **Consequences:** Customer starts a **new** cart after placing an order, even while payment is pending. Idempotent place-order replay must tolerate an already-`converted` cart linked via reservations.
 
 ---
 
@@ -406,6 +416,166 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 
 ---
 
+## L2. Store administration (Milestone 10)
+
+**References:** [STORE_ADMINISTRATION_PLAN.md](STORE_ADMINISTRATION_PLAN.md), [STORE_ADMINISTRATION_SCOPE.md](STORE_ADMINISTRATION_SCOPE.md).
+
+### Summary
+
+| ID | Decision | Status | Blocks order admin? |
+| --- | --- | --- | --- |
+| ADMIN-001 | Admin provisioning via Artisan; no public registration | **Approved** | No (bootstrap only) |
+| ADMIN-002 | Reuse `web` guard; separate admin routes, login/logout, middleware | **Approved** | No |
+| ADMIN-003 | MVP: `role = admin` and `is_active`; no Spatie/complex RBAC (**OPEN-004** stays Open) | **Approved** | No |
+| ADMIN-004 | Prefer archive/deactivate over hard delete when orders reference catalog | **Approved** | No |
+| ADMIN-005 | Transactional stock adjust; never `on_hand` &lt; reserved; adjustments do not touch reservations | **Approved** | No |
+| ADMIN-006 | Order status transition and cancellation matrix | **Approved** | No |
+| ADMIN-007 | Payment information read-only in admin; no manual capture/success/refund | **Approved** | No |
+| ADMIN-008 | `lang/en/admin.php` and `lang/ar/admin.php`; preserve EN/AR and RTL/LTR | **Approved** | No |
+| ADMIN-009 | Customer administration read-only for MVP; defer user deactivation | **Approved** | No |
+| ADMIN-010 | No separate audit table; use movements, status histories, rate creator metadata | **Approved** | No |
+
+**OPEN (unchanged):** OPEN-001 (payment provider), OPEN-003 (tax), OPEN-004 (permission package — **not** resolved by ADMIN-003; future package choice remains Open).
+
+---
+
+**ADMIN-001 — Admin provisioning**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** Create the **first** admin user through an Artisan command (e.g. `admin:create-user`). **No** public admin registration. Non-production seeders may create test admins.
+- **Consequences:** Production bootstrap depends on CLI access; document command in deployment notes.
+
+**ADMIN-002 — Admin authentication boundary**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** Reuse the Laravel **`web`** session guard (**AUTH-001**). Separate **admin routes**, **admin login/logout**, and **admin middleware** from the storefront customer area.
+- **Consequences:** Role-aware guest redirects required when admin ships (see AUTH note in §I).
+
+**ADMIN-003 — MVP admin authorization**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** MVP administration requires `users.role = admin` and `users.is_active = true`. Do **not** introduce Spatie or a complex RBAC package for Milestone 10.
+- **OPEN-004:** Remains **Open** for a future permission-package decision. ADMIN-003 does **not** approve a package-based model.
+
+**ADMIN-004 — Catalog deletion vs archive**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** Prefer **archiving/deactivation** over hard deletion for catalog records referenced by orders. Hard-delete only records that are safe and unused.
+- **Consequences:** Admin catalog Actions must guard destructive deletes; align with product/variant `status` and soft deletes where present.
+
+**ADMIN-005 — Manual stock adjustments**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** Stock adjustments must run in a **database transaction** with appropriate row locking. Never reduce `quantity_on_hand` below **reserved** quantity. Manual adjustments **must not** modify reservation rows.
+- **Consequences:** `AdjustStockAction` enforces invariants per **INV-004**; admin cannot “fix” reservations via adjust.
+
+**ADMIN-006 — Order status transitions and cancellation**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** MVP order lifecycle, cancellation, payment interaction, and admin fulfillment transitions are fixed per the **approved matrix** below. Align `TransitionOrderStatusAction`, `CancelOrderAction`, payment success/failure Actions, and expiry orchestration with this matrix. **`refunded`** is outside the MVP transition workflow (**PAY-004** Deferred).
+- **Rules (owner):**
+  1. Allowed lifecycle: new order → `pending_payment`; verified failure → `payment_failed` (hold reservation); verified success → `processing` (commit reservation); retry success from `payment_failed` when reservation still `active`; cancel from `pending_payment` or `payment_failed` (customer, admin, or system expiry); admin `processing` → `shipped` → `delivered`.
+  2. **No** cancellation from `processing`, `shipped`, or `delivered` in MVP.
+  3. **No** manual admin payment success, capture, or refund (**ADMIN-007**).
+  4. Only **verified provider** success may transition an order to `processing`.
+  5. Late payment success after cancellation must **not** resurrect the order or commit stock; **reconciliation only** (**CHECKOUT-009**).
+  6. Ordinary payment failure **retains** reservations for retry; only **explicit cancellation** or **expiry** releases them.
+  7. Cart conversion at order placement (**CHECKOUT-014**).
+- **Consequences:** Order admin UI and Actions implement this matrix; expiry implementation must close the gap documented below.
+
+**ADMIN-007 — Read-only payments in admin**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** Payment information in the admin area is **read-only**. No manual payment success, capture, or refund actions until **OPEN-001** and payment integration are resolved (**PAY-004** Deferred).
+- **Consequences:** Admin shows `payments` and attempts; status changes only via future verified provider flows.
+
+**ADMIN-008 — Admin localization**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** Use separate `lang/en/admin.php` and `lang/ar/admin.php` translation files. Preserve English/Arabic content support and RTL/LTR theming for the admin UI consistent with project localization rules.
+- **Consequences:** New translation namespace; admin layout must support direction/theme switching where applicable.
+
+**ADMIN-009 — Customer administration (MVP)**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** Customer administration is **read-only** for MVP (list, search, profile, addresses, order history visibility). **Defer** customer **deactivation** (`users.is_active`) until login and order consequences are defined.
+- **Consequences:** No deactivate toggle in Milestone 10 unless a follow-up decision approves it.
+
+**ADMIN-010 — Audit trail (MVP)**
+- **Status:** Approved (project owner).
+- **Date:** 2026-11-17.
+- **Statement:** No separate admin audit table in MVP. Rely on existing `inventory_movements`, `order_status_histories`, and `currency_exchange_rates.created_by_user_id`.
+- **Consequences:** Important admin events must populate those fields where applicable (`actor_user_id`, `created_by_user_id`).
+
+### ADMIN-006 — Approved transition matrix
+
+Order status constants (MVP): `pending_payment`, `payment_failed`, `processing`, `shipped`, `delivered`, `cancelled`, `refunded` (`App\Domains\Orders\Models\Order`). **`refunded`** is **not** part of the MVP workflow below (**PAY-004** Deferred).
+
+#### A. Allowed transitions
+
+| From → To | Who | Reservation / stock | Notes |
+| --- | --- | --- | --- |
+| — → `pending_payment` | Customer — `PlaceOrderAction` | Reserve → `active` | Pending `payments` row; cart → `converted` (**CHECKOUT-014**) |
+| `pending_payment` → `payment_failed` | Verified provider failure — `RecordPaymentFailureAction` | **Hold** — stay `active` (**CHECKOUT-006**) | Not ordinary HTTP abandon unless mapped to verified failure |
+| `payment_failed` → `processing` | Verified provider success (retry) | **Commit** if reservations still `active` | Blocked if expired/cancelled |
+| `pending_payment` → `processing` | Verified provider success only | **Commit**; `paid_at` | **ADMIN-007** — no admin override |
+| `processing` → `shipped` | Admin — `TransitionOrderStatusAction` | None (stock committed) | |
+| `shipped` → `delivered` | Admin | None | Terminal fulfillment |
+| `pending_payment` → `cancelled` | Customer or admin — `CancelOrderAction` | **Release** active reservations | Cancel pending payments |
+| `payment_failed` → `cancelled` | Customer or admin | **Release** active reservations | **Not** caused by ordinary payment failure alone |
+| `pending_payment` / `payment_failed` → `cancelled` | System — expiry orchestration | Expire/release reservations | See **Expiry implementation gap** |
+| `cancelled` → * | — | ✗ | Late success → reconciliation only (**CHECKOUT-009**) |
+
+#### B. Forbidden in MVP
+
+| Transition / action | Reason |
+| --- | --- |
+| `processing` / `shipped` / `delivered` → `cancelled` | **ADMIN-006** rule 2 |
+| Fulfillment rollback (`delivered` → `shipped`, etc.) | No documented MVP path |
+| `processing` ← admin or unverified source | Rule 4 — provider-verified success only |
+| `*` → `refunded` | Outside MVP workflow |
+| Admin manual capture / mark paid | **ADMIN-007** |
+
+#### C. Cancellation by status (MVP)
+
+| Status | Customer cancel | Admin cancel | System (expiry) |
+| --- | --- | --- | --- |
+| `pending_payment` | ✓ | ✓ | ✓ (when orchestrated) |
+| `payment_failed` | ✓ | ✓ | ✓ (when orchestrated) |
+| `processing`, `shipped`, `delivered` | ✗ | ✗ | ✗ |
+| `cancelled`, `refunded` | ✗ | ✗ | ✗ |
+
+#### D. Ordinary payment failure vs cancellation vs expiry
+
+| Event | Order status | Reservations | Payments |
+| --- | --- | --- | --- |
+| **Ordinary payment failure** (verified) | → `payment_failed` | **Remain `active`** — retry allowed (**CHECKOUT-006**, **CHECKOUT-007**) | Attempt → `failed`; new attempt on retry |
+| **Explicit cancel** (customer/admin) | → `cancelled` | **Release** active (`ReleaseReservationAction`) | Pending attempts → `cancelled` |
+| **TTL expiry** (system) | → `cancelled` (required) | Expire/release per reservation | No new retries on same order |
+
+Ordinary failure is **not** cancellation. Abandoning a redirect without a verified failure event does **not** by itself release stock unless product maps that case to verified failure or the customer/admin cancels.
+
+#### E. Payment success vs expiry race (MVP requirements)
+
+Verified payment success and reservation expiry **must not** both win. Handlers and expiry orchestration **must**:
+
+1. Use **transactions** and **row locks** on the order and reservation rows (same discipline as reserve/commit).
+2. **Success path:** Before `MarkOrderPaidAction` / `CommitReservationAction`, assert order ∈ (`pending_payment`, `payment_failed`), order **not** `cancelled`, and all order reservations required for commit are still **`active`** and unexpired.
+3. **Expiry path:** When the last active reservation for an unpaid order is expired/released, transition order → `cancelled` with `cancelled_at` and status history in the **same transactional boundary** as inventory updates (or a single orchestrating Application/Checkout entry that calls Inventory then Orders in one transaction).
+4. If success arrives after order is **`cancelled`** (expiry or manual): **do not** move order to `processing`; **do not** commit stock; record event; **reconciliation only** (**CHECKOUT-009**, rule 5).
+
+#### F. Expiry implementation gap (Milestone 10 / payment follow-on)
+
+**Approved behavior (E3 in [CHECKOUT_WORKFLOW_DESIGN.md](CHECKOUT_WORKFLOW_DESIGN.md)):** after TTL, expire reservations and cancel unpaid orders when no active reservations remain.
+
+**Current code:** `ExpireReservationsAction` expires inventory reservations only; it does **not** invoke `CancelOrderAction` or update order status.
+
+**Required in implementation milestone:** Close this gap **safely and transactionally** (or via a documented orchestrator used by `ExpireReservationsJob`) so orders do not remain `pending_payment` / `payment_failed` with zero active holds. Do not change **ADMIN-006** rules; implement coordination per §E.
+
+**References:** [BUSINESS_WORKFLOWS.md](BUSINESS_WORKFLOWS.md), [STORE_ADMINISTRATION_PLAN.md](STORE_ADMINISTRATION_PLAN.md) §5.3.
+
+---
+
 ## L. Deferred and out-of-scope
 
 **Deferred** (documented intent to ship later — **not** rejected)
@@ -413,7 +583,7 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 | Area | Examples | Sources |
 | --- | --- | --- |
 | Payments | Provider integration, webhooks, `InitiatePaymentAction`, reconciliation jobs | [MVP_SCOPE.md](MVP_SCOPE.md), [CHECKOUT_WORKFLOW_DESIGN.md](CHECKOUT_WORKFLOW_DESIGN.md) |
-| Admin | Admin login, catalog/inventory admin UI, policies for admin routes | [MVP_SCOPE.md](MVP_SCOPE.md) |
+| Admin | **Milestone 10** — admin login, catalog/inventory/order admin UI (was deferred; now planned) | [STORE_ADMINISTRATION_SCOPE.md](STORE_ADMINISTRATION_SCOPE.md) |
 | Customer (post-M9) | Order history pages, password reset UI, email verification | [MVP_SCOPE.md](MVP_SCOPE.md), M9 scope boundary |
 | Auth (API) | API authentication / Sanctum | [MVP_SCOPE.md](MVP_SCOPE.md) OPEN-002 |
 | Tier 2 | Refunds, `shipping_methods`, guest order lookup, `LinkCustomerToUserAction` (full duplicate merge) | [MVP_SCOPE.md](MVP_SCOPE.md) |
@@ -467,6 +637,7 @@ Compact index. See sections A–L for narrative. **Change history:** none supers
 | CART-001–002 | Cart rules | Approved | not established |
 | CHECKOUT-001–012 | Strategy C and guest checkout | Approved | 2026-11-13 |
 | CHECKOUT-013 | Preserve checkout in M9 | Approved | 2026-11-16 |
+| CHECKOUT-014 | Cart `converted` at order placement | Approved | 2026-11-17 |
 | ORD-001–002 | Order immutability | Approved | 2026-03-20 |
 | PAY-001–003 | Payment records | Approved | 2026-03-20 |
 | PAY-004 | Refunds | Deferred | not established |
@@ -480,6 +651,16 @@ Compact index. See sections A–L for narrative. **Change history:** none supers
 | OPEN-002 | API auth mechanism | Open | [MVP_SCOPE.md](MVP_SCOPE.md) |
 | OPEN-003 | Tax jurisdiction | Open | [MVP_SCOPE.md](MVP_SCOPE.md) |
 | OPEN-004 | `users.role` vs permission package | Open | [MVP_SCOPE.md](MVP_SCOPE.md) |
+| ADMIN-001 | Admin provisioning (Artisan) | Approved | 2026-11-17 |
+| ADMIN-002 | Admin `web` guard + separate routes | Approved | 2026-11-17 |
+| ADMIN-003 | MVP simple `admin` role; OPEN-004 remains Open | Approved | 2026-11-17 |
+| ADMIN-004 | Archive over hard delete (catalog) | Approved | 2026-11-17 |
+| ADMIN-005 | Stock adjustment invariants | Approved | 2026-11-17 |
+| ADMIN-006 | Order transition / cancel matrix | Approved | 2026-11-17 |
+| ADMIN-007 | Read-only payments in admin | Approved | 2026-11-17 |
+| ADMIN-008 | Admin `lang/*/admin.php` + RTL/LTR | Approved | 2026-11-17 |
+| ADMIN-009 | Read-only customer admin; defer deactivate | Approved | 2026-11-17 |
+| ADMIN-010 | No separate audit table (MVP) | Approved | 2026-11-17 |
 
 ### OPEN items (require owner approval)
 
@@ -488,7 +669,7 @@ Compact index. See sections A–L for narrative. **Change history:** none supers
 | OPEN-001 | Payment provider | Must support transaction currencies at checkout |
 | OPEN-002 | API authentication | Session vs Sanctum for API v1 — **customer web** uses session per AUTH-001 |
 | OPEN-003 | Tax jurisdiction | Blocks enabling `tax_enabled` |
-| OPEN-004 | Admin permission model | Simple `role` vs package |
+| OPEN-004 | Admin permission model | Simple `role` vs package — **MVP uses simple role per ADMIN-003**; package choice **still Open** |
 
 ---
 

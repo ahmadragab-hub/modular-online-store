@@ -68,11 +68,17 @@ Phased implementation from foundation to production deployment. Adjust dates wit
 
 ## Phase 7 — Storefront and admin UX
 
-- Fashion-oriented PLP/PDP, cart, checkout flow (web)
-- Admin dashboards for catalog, orders, inventory
-- API parity for mobile/headless clients
+- Fashion-oriented PLP/PDP, cart, checkout flow (web) — **storefront MVP largely complete**
+- **Milestone 10:** Admin dashboards and CRUD for catalog, orders, inventory, customers, store config ([STORE_ADMINISTRATION_PLAN.md](STORE_ADMINISTRATION_PLAN.md))
+- API parity for mobile/headless clients — deferred
 
-**Depends on:** Phase 6
+**Depends on:** Phase 6 (payments deferred; admin order UI read-only for capture until provider chosen)
+
+### Milestone 10 — Store Administration (consolidated)
+
+**Goal:** One admin area, one PR — WP1 auth shell through WP7 dashboard ([STORE_ADMINISTRATION_SCOPE.md](STORE_ADMINISTRATION_SCOPE.md)).
+
+**Prerequisites:** Milestone 9 customer accounts; tier-1 schema; **ADMIN-001–010** and **CHECKOUT-014** **Approved** 2026-11-17; **OPEN-001**, **OPEN-003**, **OPEN-004** remain Open. Implementation must close the **expiry ↔ order cancel** gap documented under **ADMIN-006** §F.
 
 ## Phase 8 — Hardening and deployment
 

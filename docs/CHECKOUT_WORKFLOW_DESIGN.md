@@ -37,7 +37,7 @@ Approved baseline: **pending order + inventory reservation first**, then **payme
 | `InitiatePaymentAction` | Payments | After commit: gateway call, update `provider_*` on **existing** pending payment (or create row for retry — see §3.C) |
 | `PaymentGatewayContract` | Payments Contract | `initiateCheckout(Payment $payment, Order $order): PaymentInitiationResult` |
 | `HandleProviderWebhookAction` | Payments | Idempotent event ingest + domain transitions |
-| `CompletePaymentSuccessAction` | Checkout or Payments | Orchestrates post-success transaction (payment captured, order paid, commit stock, cart converted) |
+| `CompletePaymentSuccessAction` | Checkout or Payments | Orchestrates post-success transaction (payment captured, order paid, commit stock); cart already `converted` per **CHECKOUT-014** |
 | `RecordPaymentFailureAction` | Payments | Mark payment failed; transition order → `payment_failed` |
 | `ReleaseReservationAction` | Inventory | On cancel / expiry / explicit abandon (not ordinary decline) |
 | `CommitReservationAction` | Inventory | On captured payment |
@@ -167,7 +167,7 @@ Recommended **order of operations** (respects FKs and failure rollback):
       - attempt_number = 1
       - amount = orders.grand_total, currency_code = orders.currency_code
       - status pending, new payments.idempotency_key (distinct from order key)
-8. Optional: cart remains active until payment success (recommended per MarkCartConverted on success only)
+8. Mark cart `converted` (same transaction) — **CHECKOUT-014** / **ADMIN-006**; customer obtains a new cart for further shopping while payment is pending
 ```
 
 **Lock strategy**
@@ -240,8 +240,8 @@ Entry: `HandleProviderWebhookAction` (HTTP controller validates HTTP shape only)
 | W7 | **Success path** — new `DB::transaction()` |
 | W7a | Update payment → `captured` (or `authorized` then capture if two-step); set timestamps |
 | W7b | Orders: `MarkOrderPaidAction` → `processing`, `paid_at`, status history |
-| W7c | `CommitReservationAction` per reservation |
-| W7d | `MarkCartConvertedAction` |
+| W7c | `CommitReservationAction` per reservation (only if order not `cancelled` and reservations still `active` — race with expiry) |
+| W7d | Cart: **no-op** if already `converted` (**CHECKOUT-014**); do not require conversion on success |
 | W7e | Update `payment_provider_events.processed_at`, `processing_result = success` |
 | W8 | **Failure path** — `RecordPaymentFailureAction`; order `payment_failed`; **do not** release reservations (retry policy) |
 
@@ -272,8 +272,12 @@ Entry: `HandleProviderWebhookAction` (HTTP controller validates HTTP shape only)
 | --- | --- |
 | E1 | Find `inventory_reservations` where `status = active` and `expires_at < now` |
 | E2 | Per reservation: `ReleaseReservationAction` (level -= reserved, status `expired`, movement `reservation_release`) |
-| E3 | If order has no other active reservations and status ∈ (`pending_payment`, `payment_failed`) → `CancelOrderAction` |
+| E3 | If order has no other active reservations and status ∈ (`pending_payment`, `payment_failed`) → `CancelOrderAction` (**ADMIN-006**) |
 | E4 | Idempotent: second run ignores `expired` / `released` |
+
+**Implementation gap (documented 2026-11-17):** `ExpireReservationsAction` today performs E1–E2 only. Milestone implementation **must** add safe transactional E3 orchestration (Inventory + Orders) per **ADMIN-006** §F in [PROJECT_DECISIONS.md](PROJECT_DECISIONS.md).
+
+**Payment success vs expiry race:** Success handler (W7) and expiry orchestration (E3) must use order/reservation locks and status guards so exactly one outcome wins; late success after `cancelled` → reconciliation only (**CHECKOUT-009**).
 
 ### Repeated expiry / cancel events
 
@@ -333,7 +337,7 @@ Use status guards on reservation and order Actions (only transition from allowed
 | Payment retry | Second payment row, same order, active reservation |
 | Webhook handler | Duplicate event ignored; amount mismatch rejected |
 | Expire job | Releases stock; cancels order; blocks retry |
-| Cart | Stays active until success; `converted` after capture |
+| Cart | `converted` at place order (**CHECKOUT-014**); success path does not convert again |
 
 ### Fakes
 
