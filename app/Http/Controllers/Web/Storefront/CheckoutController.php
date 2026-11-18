@@ -9,6 +9,9 @@ use App\Domains\Checkout\Exceptions\PlaceOrderIdempotencyConflictException;
 use App\Domains\Inventory\Exceptions\InsufficientStockException;
 use App\Domains\Inventory\Exceptions\InvalidStockReservationRequestException;
 use App\Domains\Orders\Models\Order;
+use App\Domains\Payments\Actions\InitiatePaymentAction;
+use App\Domains\Payments\Exceptions\PaymentGatewayException;
+use App\Domains\Payments\Exceptions\PaymentOperationException;
 use App\Domains\Store\Models\Currency;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\PlaceOrderRequest;
@@ -33,13 +36,14 @@ class CheckoutController extends Controller
         return view('storefront.checkout.show', [
             'cart' => $cart,
             'transactionCurrencies' => $transactionCurrencies,
-            'defaultTransactionCurrency' => 'USD',
+            'defaultTransactionCurrency' => 'EGP',
         ]);
     }
 
     public function store(
         PlaceOrderRequest $request,
         PlaceOrderAction $placeOrderAction,
+        InitiatePaymentAction $initiatePaymentAction,
         GuestCartResolver $guestCartResolver,
     ): RedirectResponse {
         $cart = $guestCartResolver->loadCartWithItems($guestCartResolver->resolve($request)->cart);
@@ -59,9 +63,16 @@ class CheckoutController extends Controller
                 $request->session()->put(GuestCartSession::SESSION_KEY, GuestCartSession::generateToken());
             }
 
-            return redirect()
-                ->route('storefront.checkout.success', ['publicUuid' => $result->publicUuid])
-                ->with('checkout_order_number', $result->orderNumber);
+            try {
+                $initiation = $initiatePaymentAction->execute($result->paymentId);
+
+                return redirect()->away($initiation->redirectUrl);
+            } catch (PaymentGatewayException|PaymentOperationException) {
+                return redirect()
+                    ->route('storefront.checkout.success', ['publicUuid' => $result->publicUuid])
+                    ->with('checkout_order_number', $result->orderNumber)
+                    ->withErrors(['payment' => __('storefront.checkout.errors.payment_initiation')]);
+            }
         } catch (PlaceOrderIdempotencyConflictException) {
             abort(409, __('storefront.checkout.errors.conflict'));
         } catch (PlaceOrderException $exception) {
@@ -92,8 +103,11 @@ class CheckoutController extends Controller
                 ->withErrors(['checkout' => __('storefront.checkout.errors.not_found')]);
         }
 
+        $order->load(['payments' => fn ($q) => $q->orderByDesc('attempt_number')]);
+
         return view('storefront.checkout.success', [
             'order' => $order,
+            'latestPayment' => $order->payments->first(),
         ]);
     }
 

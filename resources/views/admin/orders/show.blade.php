@@ -13,9 +13,21 @@
 </section>
 <section class="mb-6">
     <h2 class="font-medium">Payments (read-only)</h2>
-    <ul class="text-sm">
-        @foreach ($order->payments as $payment)
-            <li>#{{ $payment->attempt_number }} — {{ $payment->status }} — {{ $payment->amount }}</li>
+    <ul class="text-sm space-y-2">
+        @foreach ($order->payments->sortBy('attempt_number') as $payment)
+            <li>
+                #{{ $payment->attempt_number }} — {{ $payment->status }}
+                — {{ $payment->amount }} {{ $payment->currency_code }}
+                @if ($payment->provider)
+                    — {{ $payment->provider }}
+                @endif
+                @if ($payment->provider_payment_id)
+                    — {{ $payment->provider_payment_id }}
+                @endif
+                @if ($payment->failed_at)
+                    — {{ $payment->failure_code }}
+                @endif
+            </li>
         @endforeach
     </ul>
 </section>

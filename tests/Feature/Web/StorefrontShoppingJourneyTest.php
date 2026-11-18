@@ -101,7 +101,7 @@ class StorefrontShoppingJourneyTest extends TestCase
 
         $this->withSession([GuestCartSession::SESSION_KEY => $rotated])
             ->post(route('storefront.checkout.store'), $payload)
-            ->assertRedirect(route('storefront.checkout.success', ['publicUuid' => $order->public_uuid]));
+            ->assertRedirect();
 
         $this->assertSame($reservationCount, InventoryReservation::query()->count());
         $this->assertSame($paymentCount, Payment::query()->count());

@@ -87,14 +87,16 @@ class GuestCartCheckoutLifecycleTest extends TestCase
             ->post(route('storefront.checkout.store'), $this->checkoutPayload($idempotencyKey));
 
         $order = Order::query()->where('idempotency_key', $idempotencyKey)->firstOrFail();
-        $first->assertRedirect(route('storefront.checkout.success', ['publicUuid' => $order->public_uuid]));
+        $first->assertRedirect();
+        $this->assertStringContainsString('/payments/mock/', $first->headers->get('Location', ''));
 
         $rotatedToken = session(GuestCartSession::SESSION_KEY);
         $this->assertNotSame($cart->session_token, $rotatedToken);
 
-        $this->withSession([GuestCartSession::SESSION_KEY => $rotatedToken])
-            ->post(route('storefront.checkout.store'), $this->checkoutPayload($idempotencyKey))
-            ->assertRedirect(route('storefront.checkout.success', ['publicUuid' => $order->public_uuid]));
+        $retry = $this->withSession([GuestCartSession::SESSION_KEY => $rotatedToken])
+            ->post(route('storefront.checkout.store'), $this->checkoutPayload($idempotencyKey));
+        $retry->assertRedirect();
+        $this->assertStringContainsString('/payments/mock/', $retry->headers->get('Location', ''));
 
         $this->assertSame(1, Order::query()->where('idempotency_key', $idempotencyKey)->count());
     }

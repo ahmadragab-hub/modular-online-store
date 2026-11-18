@@ -1,6 +1,6 @@
 # Project decision log
 
-**Last reviewed:** 2026-11-16
+**Last reviewed:** 2026-11-18
 **Repository:** modular-online-store
 **Authority:** This log records **approved** product, business, architecture, and technical decisions. Detailed specifications remain in linked documents; this file records **what** was decided and **why**, and tracks changes over time.
 
@@ -48,9 +48,10 @@
 | Item | Verified state (2026-11-17) |
 | --- | --- |
 | **Stable branch** | `main` at `5b18d1f` (merge of PR #8) |
-| **Current branch** | `feature/store-administration` (Milestone 10 planning) |
+| **Current branch** | `feature/store-administration` (Milestone 10 admin + lock-order work in progress on branch) |
 | **Milestone 9 status** | **Implemented** — customer auth, cart merge, profile, addresses (see branch history / merge state) |
-| **Milestone 10 status** | **Planned** — store administration (see [STORE_ADMINISTRATION_PLAN.md](STORE_ADMINISTRATION_PLAN.md)) |
+| **Milestone 10 status** | **Implemented on branch** — store administration (see [STORE_ADMINISTRATION_IMPLEMENTATION_REPORT.md](STORE_ADMINISTRATION_IMPLEMENTATION_REPORT.md)) |
+| **Milestone 11 status** | **Planned** — payment provider integration (see [PAYMENT_PROVIDER_INTEGRATION_PLAN.md](PAYMENT_PROVIDER_INTEGRATION_PLAN.md)) |
 
 ### Merged milestones (Git)
 
@@ -75,7 +76,8 @@
 - Storefront: guest cart, shop/PDP, checkout placement (`PlaceOrderAction`, inventory reservation, pending order/payment rows).
 - Customer registration/login: implemented on feature work (**Milestone 9**); verify merge state on `main`.
 - Admin UI: **not implemented** (Milestone 10 planning).
-- Payment provider HTTP, webhooks, and post-commit `InitiatePaymentAction`: **not** wired on `main` (design approved; integration **Deferred**).
+- Post-commit `InitiatePaymentAction` + **Mock** `PaymentGatewayContract` adapter wired for non-production MVP (**PAY-008**). Real provider (**OPEN-001**) remains **Open**.
+- Verified payment Actions (`CompleteVerifiedPaymentSuccessAction`, `RecordPaymentFailureAction`) and admin unpaid workflows: **implemented on branch**; must only be invoked **after** provider verification in Milestone 11.
 - API v1: health endpoint only.
 
 ---
@@ -161,7 +163,7 @@
 | DB-010 | Payments + `payment_provider_events`; no card storage | Approved |
 | DB-011 | No `checkout_sessions` table in MVP | Approved |
 | DB-012 | Cross-domain writes via owning domain Actions | Approved |
-| DB-013 | How to enforce one-active-cart at the **database** layer | Open |
+| DB-013 | MySQL `active_customer_claim` generated column + UNIQUE (one active cart per customer) | Approved |
 
 **DB-002 — Users vs Customers**
 - **Statement:** `users` holds credentials and `role`; `customers` holds shopper profile, preferences, addresses, and links to orders. One registered customer row per user (`user_id` unique).
@@ -175,7 +177,7 @@
 
 **One active cart — business rule vs database enforcement**
 - **AUTH-023 (Approved):** At most one **active** cart per **customer** is an approved **business invariant** ([DOMAIN_DATA_OWNERSHIP.md](DOMAIN_DATA_OWNERSHIP.md), [DATABASE_DESIGN.md](DATABASE_DESIGN.md)). Guest carts follow one active cart per guest session identity (**CART-001**). Milestone 9 **AUTH-024–025** define operational handling when duplicates are detected.
-- **DB-013 (Open):** The precise **database** enforcement mechanism (for example application-only logic, partial unique index, or other constraint) is **not** approved. Do not assume application-only enforcement or any specific schema constraint is the decided approach until the owner approves **DB-013**.
+- **DB-013 (Approved, 2026-11-18):** On **MySQL**, `carts.active_customer_claim` (**VIRTUAL** generated; STORED rejected on MySQL 9.x when expression references FK columns) + UNIQUE index enforces at most one `status = active` row per `customer_id`. Migration **fails** if duplicate active rows exist. Non-MySQL environments rely on **AUTH-025** application enforcement only.
 
 ---
 
@@ -185,12 +187,12 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 
 | ID | Decision | Status |
 | --- | --- | --- |
-| CUR-001 | Base currency **USD** | Approved |
-| CUR-002 | Supported: **USD, EGP, KWD** | Approved |
-| CUR-003 | Variant/catalog prices stored in **USD** | Approved |
-| CUR-004 | Manual admin exchange rates (USD → quote per 1 USD) | Approved |
+| CUR-001 | Base currency **EGP** (store default; Egypt merchant context) | Approved — supersedes USD-base **CUR-001** (2026-11-18) |
+| CUR-002 | **Payment** currencies at checkout: **EGP, USD** (`transaction_enabled`); KWD and others display-only unless re-enabled | Approved |
+| CUR-003 | Variant/catalog prices stored in **EGP** (catalog base) | Approved — supersedes USD-base **CUR-003** (2026-11-18) |
+| CUR-004 | Manual admin exchange rates: **quote per 1 EGP** (e.g. USD row = USD per 1 EGP) | Approved — supersedes USD-base rate direction (2026-11-18) |
 | CUR-005 | Display currency ≠ transaction currency | Approved |
-| CUR-006 | Missing FX rate blocks non-USD checkout | Approved |
+| CUR-006 | Missing FX rate blocks **USD** checkout; **EGP** checkout unaffected | Approved — supersedes “blocks non-USD” (2026-11-18) |
 | CUR-007 | Orders/payments freeze currency, amounts, `exchange_rate` | Approved |
 | CUR-008 | `minor_units`: USD 2, EGP 2, KWD 3 | Approved |
 | CUR-009 | Decimal arithmetic; avoid float money (BCMath / `MoneyMath`) | Approved |
@@ -242,7 +244,7 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 | ID | Decision | Status |
 | --- | --- | --- |
 | CART-001 | Guest cart via server `session_token` in session | Approved |
-| CART-002 | Cart lines store USD `unit_price_base` snapshots | Approved |
+| CART-002 | Cart lines store catalog **base currency** `unit_price_base` snapshots (EGP) | Approved |
 | CHECKOUT-001 | **Strategy C:** reserve stock + pending order + pending payment **inside DB transaction** | Approved |
 | CHECKOUT-002 | **No** payment provider HTTP inside DB transaction | Approved |
 | CHECKOUT-003 | Provider call **after** transaction commits | Approved |
@@ -262,7 +264,7 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 **Current implementation facts (`main`):**
 
 - `PlaceOrderAction`, `PrepareCheckoutAction`, guest storefront checkout implemented.
-- Post-commit payment initiation and webhook handling: **Deferred** (pending payment row created; no live gateway).
+- Post-commit **mock** payment initiation implemented (**PAY-008**); real provider webhooks **Deferred** (**OPEN-001**).
 - `ResolveOrCreateCustomerAction` as separate class: **not** extracted; logic inline in `PlaceOrderAction::resolveCustomer()` (**Inferred** gap vs design doc naming).
 
 **CHECKOUT-013 — Preserve checkout in Milestone 9**
@@ -289,6 +291,28 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 | PAY-002 | `payment_provider_events` deduplicated | Approved |
 | PAY-003 | No storage of sensitive card data in MVP | Approved |
 | PAY-004 | Refunds table/workflows | Deferred (Tier 2) |
+| PAY-005 | `PaymentGatewayContract` + single production provider adapter | Open |
+| PAY-008 | MVP **Mock** gateway behind `PaymentGatewayContract`; **disabled in production** (`APP_ENV=production`); no external HTTP | Approved |
+| PAY-006 | Scheduled stale-payment reconciliation (provider-dependent) | Open |
+| PAY-007 | Optional `payments.initiated_at`, reconciliation fields | Open |
+
+**PAY-005 — Payment gateway contract (proposed, Open)**
+- **Status:** Open (Milestone 11 planning 2026-11-18).
+- **Statement:** Introduce a single `PaymentGatewayContract` and one concrete adapter for the provider chosen under **OPEN-001**; bind in `AppServiceProvider`; use a fake implementation in tests. Do not leak provider SDK types into Checkout or Orders domains.
+- **References:** [PAYMENT_PROVIDER_INTEGRATION_PLAN.md](PAYMENT_PROVIDER_INTEGRATION_PLAN.md), [CHECKOUT_WORKFLOW_DESIGN.md](CHECKOUT_WORKFLOW_DESIGN.md).
+
+**PAY-006 — Stale payment reconciliation (proposed, Open)**
+- **Status:** Open — depends on provider APIs after **OPEN-001**.
+- **Statement:** A scheduled reconciliation command is **optional** for MVP unless the selected provider requires polling when webhooks are delayed or missing. Do not implement polling without provider-specific approval.
+
+**PAY-007 — Supplemental payment columns (proposed, Open)**
+- **Status:** Open.
+- **Statement:** Optional nullable `initiated_at` and reconciliation status fields on `payments` may be added if initiation and ops visibility require them; not required before first adapter if existing timestamps suffice.
+
+**OPEN-005 — Merchant jurisdiction and settlement (new)**
+- **Status:** Open.
+- **Statement:** Business registration country, settlement country, settlement currency, and required local payment methods are **not** approved. **OPEN-001** (provider choice) must not be marked Approved until **OPEN-005** inputs are recorded.
+- **References:** [PAYMENT_PROVIDER_EVALUATION.md](PAYMENT_PROVIDER_EVALUATION.md).
 
 ---
 
@@ -349,7 +373,7 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 - **Status:** Approved.
 - **Date:** 2026-11-17.
 - **Statement:** **AUTH-023** remains the business invariant. Under normal operations, authenticated customer cart creation and resolution **must** go through `GetOrCreateCustomerCartAction`, which locks the owning `Customer` row inside a transaction before checking for or creating the customer's active cart. If multiple active carts already exist for a customer, the application **stops and reports** (**AUTH-024**); it must **not** automatically delete, abandon, or merge duplicate active carts as repair.
-- **Limits:** This is an interim **application-level** guarantee for cooperating application paths only. It is **not** a database-level guarantee against writers that bypass the Action. **DB-013** remains **Open** — database-level enforcement is **not** approved or implemented. **DB-013** must be resolved before production hardening.
+- **Limits:** On SQLite/non-MySQL, this remains the only guarantee. On **MySQL**, **DB-013** adds database rejection of a second active customer cart; **AUTH-025** locking and `GetOrCreateCustomerCartAction` remain required for correct resolution on races.
 - **Verification:** Customer-cart concurrent creation has **not** been verified by a dedicated MySQL integration test that exercises true parallel connections.
 
 ### Profile and addresses
@@ -435,7 +459,7 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 | ADMIN-009 | Customer administration read-only for MVP; defer user deactivation | **Approved** | No |
 | ADMIN-010 | No separate audit table; use movements, status histories, rate creator metadata | **Approved** | No |
 
-**OPEN (unchanged):** OPEN-001 (payment provider), OPEN-003 (tax), OPEN-004 (permission package — **not** resolved by ADMIN-003; future package choice remains Open).
+**OPEN (unchanged unless noted):** OPEN-001 (payment provider), OPEN-003 (tax), OPEN-004 (permission package — **not** resolved by ADMIN-003; future package choice remains Open). **OPEN-005** (merchant jurisdiction) added Milestone 11 planning.
 
 ---
 
@@ -627,7 +651,7 @@ Compact index. See sections A–L for narrative. **Change history:** none supers
 | DB-010 | Payments and events | Approved | 2026-03-20 |
 | DB-011 | No checkout_sessions MVP | Approved | 2026-11-13 |
 | DB-012 | Cross-domain via Actions | Approved | not established |
-| DB-013 | One-active-cart database enforcement mechanism | Open | not established |
+| DB-013 | One-active-cart MySQL unique claim column | Approved | 2026-11-18 |
 | AUTH-023 | One active cart per customer (business invariant) | Approved | 2026-11-16 |
 | AUTH-025 | Interim one-active-cart enforcement (application-level) | Approved | 2026-11-17 |
 | CUR-001–010 | Currency and money rules | Approved | 2026-03-20 |
@@ -648,6 +672,11 @@ Compact index. See sections A–L for narrative. **Change history:** none supers
 | DEV-001–002, DEV-004–005 | Other git workflow rules | Approved | not established |
 | DEV-006 | PowerShell preference | Approved | 2026-11-16 |
 | OPEN-001 | Payment provider choice | Open | [MVP_SCOPE.md](MVP_SCOPE.md) |
+| OPEN-005 | Merchant jurisdiction / settlement | Open | [PAYMENT_PROVIDER_EVALUATION.md](PAYMENT_PROVIDER_EVALUATION.md) |
+| PAY-005 | Production payment gateway adapter | Open | [PAYMENT_PROVIDER_INTEGRATION_PLAN.md](PAYMENT_PROVIDER_INTEGRATION_PLAN.md) |
+| PAY-008 | Mock MVP gateway (non-production) | Approved | [MOCK_PAYMENT_IMPLEMENTATION_REPORT.md](MOCK_PAYMENT_IMPLEMENTATION_REPORT.md) |
+| PAY-006 | Stale payment reconciliation | Open | [PAYMENT_PROVIDER_INTEGRATION_PLAN.md](PAYMENT_PROVIDER_INTEGRATION_PLAN.md) |
+| PAY-007 | Optional payment schema columns | Open | [PAYMENT_PROVIDER_INTEGRATION_PLAN.md](PAYMENT_PROVIDER_INTEGRATION_PLAN.md) |
 | OPEN-002 | API auth mechanism | Open | [MVP_SCOPE.md](MVP_SCOPE.md) |
 | OPEN-003 | Tax jurisdiction | Open | [MVP_SCOPE.md](MVP_SCOPE.md) |
 | OPEN-004 | `users.role` vs permission package | Open | [MVP_SCOPE.md](MVP_SCOPE.md) |
@@ -667,6 +696,7 @@ Compact index. See sections A–L for narrative. **Change history:** none supers
 | ID | Topic | Notes |
 | --- | --- | --- |
 | OPEN-001 | Payment provider | Must support transaction currencies at checkout |
+| OPEN-005 | Merchant jurisdiction / settlement | Blocks definitive provider selection — see [PAYMENT_PROVIDER_EVALUATION.md](PAYMENT_PROVIDER_EVALUATION.md) |
 | OPEN-002 | API authentication | Session vs Sanctum for API v1 — **customer web** uses session per AUTH-001 |
 | OPEN-003 | Tax jurisdiction | Blocks enabling `tax_enabled` |
 | OPEN-004 | Admin permission model | Simple `role` vs package — **MVP uses simple role per ADMIN-003**; package choice **still Open** |
@@ -682,6 +712,8 @@ Compact index. See sections A–L for narrative. **Change history:** none supers
 - [DATABASE_DESIGN.md](DATABASE_DESIGN.md) — schema specification
 - [BUSINESS_WORKFLOWS.md](BUSINESS_WORKFLOWS.md) — checkout and currency flows
 - [CHECKOUT_WORKFLOW_DESIGN.md](CHECKOUT_WORKFLOW_DESIGN.md) — Strategy C design
+- [PAYMENT_PROVIDER_INTEGRATION_PLAN.md](PAYMENT_PROVIDER_INTEGRATION_PLAN.md) — Milestone 11 plan
+- [PAYMENT_PROVIDER_EVALUATION.md](PAYMENT_PROVIDER_EVALUATION.md) — provider comparison (conditional)
 - [MVP_SCOPE.md](MVP_SCOPE.md) — tiering and open decisions
 - [LOCALIZATION_AND_THEMES.md](LOCALIZATION_AND_THEMES.md) — locale and theme ownership
 - [GIT_WORKFLOW.md](GIT_WORKFLOW.md) — version control

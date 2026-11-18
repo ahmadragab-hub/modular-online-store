@@ -147,18 +147,18 @@ class StorefrontCartHttpTest extends TestCase
 
     public function test_cart_shows_fx_unavailable_notice_when_display_rate_missing(): void
     {
-        CurrencyExchangeRate::query()->where('quote_currency_code', 'EGP')->delete();
+        CurrencyExchangeRate::query()->where('quote_currency_code', 'USD')->delete();
 
         ['variant' => $variant] = $this->createSellableVariantForCart();
 
-        $this->withSession([StorefrontPreferences::SESSION_DISPLAY_CURRENCY => 'EGP'])
+        $this->withSession([StorefrontPreferences::SESSION_DISPLAY_CURRENCY => 'USD'])
             ->post(route('storefront.cart.items.store'), [
                 'product_variant_id' => $variant->getKey(),
                 'quantity' => 1,
             ])
             ->assertRedirect(route('storefront.cart.show'));
 
-        $this->withSession([StorefrontPreferences::SESSION_DISPLAY_CURRENCY => 'EGP'])
+        $this->withSession([StorefrontPreferences::SESSION_DISPLAY_CURRENCY => 'USD'])
             ->get(route('storefront.cart.show'))
             ->assertOk()
             ->assertSee(__('storefront.cart.fx_unavailable', [], 'en'), false)

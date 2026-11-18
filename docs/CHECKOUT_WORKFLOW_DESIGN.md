@@ -26,10 +26,10 @@ Approved baseline: **pending order + inventory reservation first**, then **payme
 | `RetryPaymentRequest` | `app/Http/Requests/Web/` | Validate order ownership + new payment idempotency key |
 | `PlaceOrderAction` | Checkout | Saga entry: idempotency, pre-checks, totals, single DB transaction, returns `PlaceOrderResult` |
 | `PlaceOrderResult` | Checkout DTO | `order_id`, `public_uuid`, `payment_id`, `grand_total`, `currency_code` (no view data) |
-| `ComputeCheckoutTotalsAction` or `CheckoutTotalsCalculator` | Store or Checkout | Given USD line bases + store settings + FX row: transaction currency totals (half-up). Prefer **Store-owned** rate lookup + calculator invoked by Checkout. |
-| `ResolveCurrentExchangeRateQuery` | Store | Latest `currency_exchange_rate` for quote currency (USD → 1.0) |
+| `PrepareCheckoutAction` / `CheckoutAmountConverter` | Checkout / Store | Given **EGP** catalog bases + store settings + FX row: transaction currency totals (half-up). |
+| `ResolveCurrentExchangeRateQuery` | Store | Latest `currency_exchange_rate` for quote currency (base **EGP** → 1.0) |
 | `ResolveOrCreateCustomerAction` | Customers | Guest/register paths; optional save addresses |
-| `RefreshCartPricesAction` | Cart | Sync USD bases from Catalog before totals |
+| `RefreshCartPricesAction` | Cart | Sync catalog-base snapshots from Catalog before totals |
 | `ValidateCartForCheckoutAction` | Cart or Checkout | Active cart, non-empty, ownership |
 | `CreatePendingOrderAction` | Orders | Order + items + initial status history |
 | `CreatePendingPaymentAction` | Payments | Row attempt 1, `pending`, amount/currency from order |
@@ -37,8 +37,8 @@ Approved baseline: **pending order + inventory reservation first**, then **payme
 | `InitiatePaymentAction` | Payments | After commit: gateway call, update `provider_*` on **existing** pending payment (or create row for retry — see §3.C) |
 | `PaymentGatewayContract` | Payments Contract | `initiateCheckout(Payment $payment, Order $order): PaymentInitiationResult` |
 | `HandleProviderWebhookAction` | Payments | Idempotent event ingest + domain transitions |
-| `CompletePaymentSuccessAction` | Checkout or Payments | Orchestrates post-success transaction (payment captured, order paid, commit stock); cart already `converted` per **CHECKOUT-014** |
-| `RecordPaymentFailureAction` | Payments | Mark payment failed; transition order → `payment_failed` |
+| `CompleteVerifiedPaymentSuccessAction` | Payments | **Implemented** — verified capture + `MarkOrderPaidAction` in one transaction; cart already `converted` per **CHECKOUT-014** |
+| `RecordPaymentFailureAction` | Payments | **Implemented** — mark payment failed; transition order → `payment_failed` (reservations retained) |
 | `ReleaseReservationAction` | Inventory | On cancel / expiry / explicit abandon (not ordinary decline) |
 | `CommitReservationAction` | Inventory | On captured payment |
 | `MarkCartConvertedAction` | Cart | `status = converted` |
@@ -238,11 +238,9 @@ Entry: `HandleProviderWebhookAction` (HTTP controller validates HTTP shape only)
 | W5 | Verify **amount** and **currency_code** match `orders.grand_total` and `orders.currency_code` (decimal string compare). |
 | W6 | If payment already `captured` → ignore duplicate success. |
 | W7 | **Success path** — new `DB::transaction()` |
-| W7a | Update payment → `captured` (or `authorized` then capture if two-step); set timestamps |
-| W7b | Orders: `MarkOrderPaidAction` → `processing`, `paid_at`, status history |
-| W7c | `CommitReservationAction` per reservation (only if order not `cancelled` and reservations still `active` — race with expiry) |
-| W7d | Cart: **no-op** if already `converted` (**CHECKOUT-014**); do not require conversion on success |
-| W7e | Update `payment_provider_events.processed_at`, `processing_result = success` |
+| W7a–e | Invoke **`CompleteVerifiedPaymentSuccessAction`** (payment capture + `MarkOrderPaidAction` + commits + history) inside one `DB::transaction`; respect lock order Order → Payment → Cart → Reservation → Level ([STORE_ADMINISTRATION_IMPLEMENTATION_REPORT.md](STORE_ADMINISTRATION_IMPLEMENTATION_REPORT.md)) |
+| W7f | Cart: **no-op** if already `converted` (**CHECKOUT-014**) |
+| W7g | Update `payment_provider_events.processed_at`, `processing_result = success` |
 | W8 | **Failure path** — `RecordPaymentFailureAction`; order `payment_failed`; **do not** release reservations (retry policy) |
 
 **Return URL handler:** May share core with webhook via `CompletePaymentSuccessAction` after provider-specific verification (not a substitute for unsigned webhooks).
@@ -275,7 +273,7 @@ Entry: `HandleProviderWebhookAction` (HTTP controller validates HTTP shape only)
 | E3 | If order has no other active reservations and status ∈ (`pending_payment`, `payment_failed`) → `CancelOrderAction` (**ADMIN-006**) |
 | E4 | Idempotent: second run ignores `expired` / `released` |
 
-**Implementation gap (documented 2026-11-17):** `ExpireReservationsAction` today performs E1–E2 only. Milestone implementation **must** add safe transactional E3 orchestration (Inventory + Orders) per **ADMIN-006** §F in [PROJECT_DECISIONS.md](PROJECT_DECISIONS.md).
+**Expiry orchestration:** E3 (`CancelUnpaidOrderWhenHoldsClearedAction` after order-linked expiry) is **implemented** on the store-administration branch (`ExpireReservationsOrderCancelTest`). Milestone 11 webhooks must remain compatible with this orchestration and lock-order rules.
 
 **Payment success vs expiry race:** Success handler (W7) and expiry orchestration (E3) must use order/reservation locks and status guards so exactly one outcome wins; late success after `cancelled` → reconciliation only (**CHECKOUT-009**).
 

@@ -5,9 +5,9 @@ Specification for the **single-store fashion e-commerce** application. Tier‑1 
 **Conventions**
 
 - Primary keys: `BIGINT UNSIGNED` auto-increment (`id`) unless noted.
-- **Base catalog currency:** **USD** (ISO 4217). Variant list prices and admin-entered shipping baselines are stored in USD unless a column explicitly states otherwise.
-- **Supported currencies:** **USD**, **EGP**, **KWD** — display and/or transaction (see [Currency model](#currency-and-exchange-rates-confirmed) below).
-- **USD catalog amounts:** `DECIMAL(12, 2)` (`cart_items.unit_price_base`, variant `price`, USD shipping baselines).
+- **Base catalog currency:** **EGP** (ISO 4217). Variant list prices and admin-entered shipping baselines are stored in EGP unless a column explicitly states otherwise.
+- **Supported currencies:** **USD**, **EGP**, **KWD** — display; **checkout payment** currencies for MVP: **EGP** and **USD** (see [Currency model](#currency-and-exchange-rates-confirmed) below).
+- **Catalog base amounts:** `DECIMAL(12, 2)` (`cart_items.unit_price_base`, variant `price`, EGP shipping baselines).
 - **Transaction-currency amounts** (orders, payments, refunds): `DECIMAL(19, 4)` — sufficient for **KWD (3)** and **USD/EGP (2)**; application rounds to `currencies.minor_units` for the row’s `currency_code` (never hardcoded).
 - **Exchange rates:** `DECIMAL(18, 8)`; arithmetic uses decimal types, not floating point.
 - **Historical immutability:** `orders`, `order_items`, `payments`, and `refunds` store the **transaction currency and amounts as charged**. Admin rate changes or default-currency config changes **must not** rewrite historical rows.
@@ -61,21 +61,22 @@ erDiagram
 
 | Rule | Decision |
 | --- | --- |
-| Default / base store currency | **USD** |
+| Default / base store currency | **EGP** |
 | Supported currencies | **USD**, **EGP**, **KWD** |
-| Catalog variant `price` | Stored in **USD** (base) |
-| EGP / KWD | Additional supported currencies — **display** (browsing) and **transaction** (checkout) via manual admin exchange rates |
+| Catalog variant `price` | Stored in **EGP** (base) |
+| USD | Additional **payment** currency at checkout via manual admin exchange rates (quote = USD per 1 EGP) |
+| KWD | Display currency only in MVP (`transaction_enabled` off) unless re-enabled |
 | Display vs payment | Customer **display currency** does **not** automatically set **payment currency** |
 | Checkout | Customer (or checkout flow) selects an **explicit supported transaction currency** |
-| Orders & payments | Persist **transaction `currency_code`** and all monetary totals in that currency, plus frozen **exchange rate metadata** tied to USD base |
+| Orders & payments | Persist **transaction `currency_code`** and all monetary totals in that currency, plus frozen **exchange rate metadata** tied to EGP base |
 | Rate changes | New rate rows only; past orders unchanged |
 
-**Conversion convention (design):** Exchange rates express **how many units of quote currency equal 1 USD**:
+**Conversion convention (design):** Exchange rates express **how many units of quote currency equal 1 EGP**:
 
-`display_amount = ROUND(usd_amount × rate, quote_minor_units)`  
-e.g. `1 USD × 48.50 = 48.50 EGP`.
+`transaction_amount = ROUND(egp_amount × rate, quote_minor_units)`
+e.g. `100 EGP × 0.02 = 2.00 USD`.
 
-USD display uses rate `1.0` (no separate row required; application treats USD as identity).
+EGP checkout uses rate `1.0` (no separate row required; application treats EGP as identity).
 
 ### Rounding and conversion policy (**confirmed**)
 
@@ -83,10 +84,10 @@ USD display uses rate `1.0` (no separate row required; application treats USD as
 
 1. Use **decimal** arithmetic only (BCMath / SQL `DECIMAL`), never float.
 2. **Half-up** round each monetary component to the transaction currency’s `minor_units`.
-3. **Order of operations at checkout (Strategy C):** For each line, convert `unit_price_base_usd` → rounded `unit_price`; `line_subtotal = unit_price × qty` (or round line from USD subtotal—**use per-line rounded `unit_price` × qty**). Convert shipping (USD baseline) and tax (when enabled) once each; sum **rounded** `subtotal`, `discount_total`, `shipping_total`, `tax_total` into `grand_total` (no silent full-order re-round from USD).
+3. **Order of operations at checkout (Strategy C):** For each line, convert catalog **base** amount → rounded `unit_price` in transaction currency; `line_subtotal = unit_price × qty`. Convert shipping (EGP baseline) and tax (when enabled) once each; sum **rounded** components into `grand_total` (no silent full-order re-round from base).
 4. Freeze `exchange_rate`, `currency_exchange_rate_id`, and `exchange_rate_effective_from` on the order row; amounts on `order_items` and `payments` match that snapshot.
 
-Display cart totals use the **current** rate; cart lines stay USD base.
+Display cart totals use the **current** rate; cart lines stay EGP base.
 
 ### `currencies`
 
@@ -545,16 +546,21 @@ Audit log of every quantity change.
 | `customer_id` | `BIGINT UNSIGNED` | YES | NULL | FK → `customers.id` |
 | `user_id` | `BIGINT UNSIGNED` | YES | NULL | FK → `users.id`, denorm convenience |
 | `session_token` | `VARCHAR(64)` | YES | NULL | Guest cart key (hashed cookie value) |
-| `base_currency_code` | `CHAR(3)` | NO | `USD` | Always USD for stored line prices |
+| `base_currency_code` | `CHAR(3)` | NO | `EGP` | Catalog base currency snapshot |
 | `display_currency_code` | `CHAR(3)` | NO | — | FK; customer browsing preference (USD/EGP/KWD) |
 | `status` | `VARCHAR(32)` | NO | `active` | `active`, `converted`, `abandoned` |
 | `expires_at` | `TIMESTAMP` | YES | NULL | Guest TTL |
 | `created_at` | `TIMESTAMP` | YES | NULL | |
 | `updated_at` | `TIMESTAMP` | YES | NULL | |
+| `active_customer_claim` | `BIGINT UNSIGNED` | YES | NULL | **MySQL only (DB-013):** generated **VIRTUAL** = `customer_id` when `status = active`, else NULL |
 
-**Indexes:** `UNIQUE (session_token)` where not null (app-enforced), `(customer_id, status)`, `(user_id, status)`.
+**Indexes:** `UNIQUE (session_token)` where not null (app-enforced), `(customer_id, status)`, `(user_id, status)`, **`UNIQUE (active_customer_claim)`** on MySQL.
 
-**Rules:** One active cart per customer or guest session (application enforcement).
+**Rules:** At most **one active cart per customer** enforced on **MySQL** via `active_customer_claim` (**DB-013**); guest carts use `session_token` uniqueness; **AUTH-025** application locking remains.
+
+**DB-013 remediation:** If migration aborts due to duplicate active customer carts, inspect `customer_id` values reported in the exception, resolve manually (abandon/convert duplicates — do not auto-merge in migration), then re-run migrate.
+
+**SQLite/devPHPUnit:** Constraint migration is a no-op on non-MySQL drivers; application enforcement applies.
 
 ### `cart_items`
 
@@ -703,6 +709,8 @@ Provider-agnostic. **No** card numbers, CVV, or full PAN storage.
 **Indexes:** `(order_id, attempt_number)`, `UNIQUE (idempotency_key)`, `UNIQUE (provider, provider_payment_id)` where not null.
 
 **Retries:** New row with incremented `attempt_number` or new idempotency key per retry policy.
+
+**Proposed Milestone 11 additions (**PAY-007** — Open, not migrated):** optional nullable `initiated_at` (provider session created), `reconciliation_status` (`none`, `pending`, `resolved`, `escalated`), and provider-specific `provider_checkout_session_id` when distinct from `provider_payment_id`. See [PAYMENT_PROVIDER_INTEGRATION_PLAN.md](PAYMENT_PROVIDER_INTEGRATION_PLAN.md) §8.
 
 ### `payment_provider_events`
 

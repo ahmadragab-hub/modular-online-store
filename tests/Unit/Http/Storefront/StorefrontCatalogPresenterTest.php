@@ -77,15 +77,29 @@ class StorefrontCatalogPresenterTest extends TestCase
 
         $card = $this->presenter->toListingCard($product, 'USD');
 
-        $this->assertSame('99.99', $card['from_price_display']);
+        $this->assertSame('2.00', $card['from_price_display']);
         $this->assertSame('$', $card['display_currency_symbol']);
     }
 
     public function test_egp_display_conversion_without_float(): void
     {
+        $product = $this->productWithTranslation('Title', 'Base');
+        $product->setRelation('images', new Collection);
+        $product->setRelation('variants', new Collection([
+            $this->variantWithPrice('10.00'),
+        ]));
+
+        $card = $this->presenter->toListingCard($product, 'EGP');
+
+        $this->assertSame('EGP', $card['display_currency_code']);
+        $this->assertSame('10.00', $card['from_price_display']);
+    }
+
+    public function test_usd_display_conversion_without_float(): void
+    {
         CurrencyExchangeRate::query()->create([
-            'quote_currency_code' => 'EGP',
-            'rate' => '48.50000000',
+            'quote_currency_code' => 'USD',
+            'rate' => '0.02000000',
             'effective_from' => now()->subDay(),
             'created_at' => now(),
         ]);
@@ -96,10 +110,10 @@ class StorefrontCatalogPresenterTest extends TestCase
             $this->variantWithPrice('10.00'),
         ]));
 
-        $card = $this->presenter->toListingCard($product, 'EGP');
+        $card = $this->presenter->toListingCard($product, 'USD');
 
-        $this->assertSame('EGP', $card['display_currency_code']);
-        $this->assertSame('485.00', $card['from_price_display']);
+        $this->assertSame('USD', $card['display_currency_code']);
+        $this->assertSame('0.20', $card['from_price_display']);
     }
 
     private function productWithTranslation(string $localizedName, string $baseName): Product
