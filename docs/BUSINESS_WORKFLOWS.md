@@ -56,8 +56,8 @@ This is the **default target** for a single-store MVP with manual FX and hosted/
    - **Payments:** insert **pending** `payments` row matching order amount/currency (record only).
 6. **After transaction commits:** `InitiatePaymentAction` invokes the **payment provider** (HTTP) and returns redirect/session data to the **HTTP controller** (DTO—not a view).
 7. On **verified success** (return URL signature check and/or idempotent webhook):
-   - **New DB transaction:** mark payment captured, order → `processing`, `CommitReservationAction`, `MarkCartConvertedAction`.
-8. On **failure / abandon:** `RecordPaymentFailureAction`, order → **`payment_failed`**, `ReleaseReservationAction` **only if** abandoning retry; otherwise keep reservation for retry (see below).
+   - **New DB transaction:** mark payment captured, order → `processing`, `CommitReservationAction` (cart already `converted` at placement — **CHECKOUT-014**).
+8. On **verified payment failure:** `RecordPaymentFailureAction`, order → **`payment_failed`**; **keep** reservations for retry (**CHECKOUT-006**). **Do not** release on ordinary failure. Release only on **explicit cancellation** or **TTL expiry** (**ADMIN-006**).
 9. **Scheduled job:** `ExpireReservationsJob` — release stock, cancel or expire stale `pending_payment` orders.
 
 **Provider caveat:** If the gateway must authorize before an order exists, introduce a provider-specific adapter under **Payments** and document the variant in implementation—without changing historical order snapshots.
@@ -84,7 +84,7 @@ Replays with the **same** idempotency key and **equivalent** checkout payload re
 | Payment declined | `payments.status = failed`; order **`payment_failed`**; **do not** release reservations; **retry** new `payments` row on **same order** while reservation **active** |
 | Customer abandons redirect | Order `payment_failed`; reservation **remains active** for retry until TTL (not released on failure alone) |
 | Customer or admin **cancellation** | Order **`cancelled`**; `ReleaseReservationAction` for active reservations |
-| Reservation TTL expires | `ExpireReservationsJob` releases stock; order **`cancelled`**; customer must start **new** checkout (`new idempotency_key` / new order) |
+| Reservation TTL expires | `ExpireReservationsJob` must expire/release stock **and** cancel unpaid order when no active holds remain (**ADMIN-006**). **Gap:** `ExpireReservationsAction` does not cancel orders yet — close in implementation.transactionally |
 | Retry after expiry | **Not allowed** on same order—prevent duplicate captures by enforcing reservation state on `InitiatePaymentAction` |
 | Late payment success after reservation expired | Order already **`cancelled`**; stock released. Handler must **not** auto-confirm order or `CommitReservationAction`. Route to **reconciliation** (ops alert; provider void/refund per runbook) |
 | Webhook before browser return | Idempotent handler updates order; redirect shows success |
@@ -283,15 +283,13 @@ sequenceDiagram
     participant PA as HandleProviderWebhookAction
     participant OR as Orders
     participant IV as Inventory
-    participant CR as Cart
-
     HTTP->>PA: verified provider event
     PA->>PA: payment_provider_events (idempotent)
     rect rgb(240, 248, 255)
         PA->>PA: mark payment captured
-        PA->>OR: MarkOrderPaidAction
+        Note over PA,OR: Reject if order cancelled or reservations not active (race with expiry)
+        PA->>OR: MarkOrderPaidAction → processing
         PA->>IV: CommitReservationAction
-        PA->>CR: MarkCartConvertedAction
     end
     PA-->>HTTP: result DTO
     HTTP->>HTTP: JSON or redirect response
@@ -303,7 +301,7 @@ sequenceDiagram
 
 ## Workflow: Payment fails
 
-1. Provider signals failure or customer abandons redirect.
+1. **Verified** provider failure (or mapped abandon policy) — not the same as explicit order cancellation.
 2. `RecordPaymentFailureAction` → `payments.status = failed`.
 3. `Orders` → **`payment_failed`** (retain order for support and retry).
 4. **Keep** active `inventory_reservations` so the customer can retry without re-checkout while TTL allows.
@@ -322,11 +320,13 @@ sequenceDiagram
 
 ## Workflow: Admin updates order status
 
-1. `TransitionOrderStatusAction` with `from_status` validation (state machine).
-2. Insert `order_status_histories`.
+1. `TransitionOrderStatusAction` with `from_status` validation (**ADMIN-006** approved matrix).
+2. Insert `order_status_histories` with `actor_user_id`.
 3. Optional: notify customer (Event `OrderStatusChanged`).
 
-**Statuses MVP:** `pending_payment` → `processing` → `shipped` → `delivered`; branches `cancelled`, `payment_failed`, `refunded`.
+**Statuses MVP (**ADMIN-006**):** `pending_payment` → `processing` → `shipped` → `delivered`; branches `payment_failed`, `cancelled`. **No** admin cancel from `processing`+; **`refunded`** outside MVP workflow.
+
+**Admin cancel (unpaid only):** From `pending_payment` or `payment_failed` only — same reservation release as customer cancel.
 
 ---
 
