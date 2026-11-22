@@ -22,8 +22,13 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist
 
+      - name: Prepare application environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi --force
+
       - name: Run PHPUnit (default SQLite)
-        run: php artisan test
+        run: vendor/bin/phpunit
 
       - name: Pint
         run: vendor/bin/pint --test
