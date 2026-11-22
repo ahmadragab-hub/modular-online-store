@@ -3,13 +3,13 @@
 @section('title', __('storefront.shop.title'))
 
 @section('content')
-    <main class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <header class="mb-8">
-            <h1 class="text-3xl font-semibold tracking-tight text-[var(--sf-text)]">{{ __('storefront.shop.title') }}</h1>
-            <p class="mt-2 text-[var(--sf-muted)]">{{ __('storefront.shop.intro') }}</p>
+    <main class="sf-container py-10 sm:py-12">
+        <header class="mb-10 max-w-2xl">
+            <h1 class="sf-display text-3xl text-[var(--sf-text)] sm:text-4xl">{{ __('storefront.shop.title') }}</h1>
+            <p class="mt-3 text-[var(--sf-muted)]">{{ __('storefront.shop.intro') }}</p>
             <p class="mt-2 text-sm text-[var(--sf-muted)]">{{ __('storefront.shop.indicative_notice') }}</p>
 
-            <form class="mt-6 flex flex-wrap gap-2" method="get" action="{{ route('storefront.shop.index') }}" role="search">
+            <form class="mt-8 flex flex-col gap-2 sm:flex-row" method="get" action="{{ route('storefront.shop.index') }}" role="search">
                 @if (! empty($activeCategorySlug))
                     <input type="hidden" name="category" value="{{ $activeCategorySlug }}">
                 @endif
@@ -20,10 +20,10 @@
                     name="q"
                     value="{{ $searchQuery ?? '' }}"
                     maxlength="100"
-                    class="min-w-[12rem] flex-1 rounded-lg border border-[var(--sf-border)] bg-[var(--sf-bg)] px-3 py-2 text-sm text-[var(--sf-text)]"
+                    class="sf-input flex-1"
                     placeholder="{{ __('storefront.shop.search_placeholder') }}"
                 />
-                <button type="submit" class="rounded-lg bg-[var(--sf-accent)] px-4 py-2 text-sm font-medium text-[var(--sf-accent-text)]">
+                <button type="submit" class="sf-btn sf-btn--primary sm:shrink-0">
                     {{ __('storefront.shop.search_submit') }}
                 </button>
             </form>
@@ -36,22 +36,14 @@
                 <nav class="mt-6 flex flex-wrap gap-2 text-sm" aria-label="{{ __('storefront.shop.categories') }}">
                     <a
                         href="{{ route('storefront.shop.index') }}"
-                        @class([
-                            'rounded-full border px-3 py-1',
-                            'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-accent-text)]' => empty($activeCategorySlug),
-                            'border-[var(--sf-border)] text-[var(--sf-text)] hover:border-[var(--sf-accent)]' => ! empty($activeCategorySlug),
-                        ])
+                        @class(['sf-chip', 'sf-chip--active' => empty($activeCategorySlug)])
                     >
                         {{ __('storefront.shop.all_categories') }}
                     </a>
                     @foreach ($categories as $category)
                         <a
                             href="{{ route('storefront.shop.index', ['category' => $category->slug]) }}"
-                            @class([
-                                'rounded-full border px-3 py-1',
-                                'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-accent-text)]' => $activeCategorySlug === $category->slug,
-                                'border-[var(--sf-border)] text-[var(--sf-text)] hover:border-[var(--sf-accent)]' => $activeCategorySlug !== $category->slug,
-                            ])
+                            @class(['sf-chip', 'sf-chip--active' => $activeCategorySlug === $category->slug])
                         >
                             {{ $category->name }}
                         </a>
@@ -64,18 +56,18 @@
         </header>
 
         @if ($products->isEmpty())
-            <div class="rounded-xl border border-dashed border-[var(--sf-border)] bg-[var(--sf-surface)] px-6 py-12 text-center">
-                <p class="text-lg font-medium text-[var(--sf-text)]">{{ __('storefront.shop.empty_title') }}</p>
+            <div class="sf-card px-6 py-16 text-center">
+                <p class="sf-display text-xl text-[var(--sf-text)]">{{ __('storefront.shop.empty_title') }}</p>
                 <p class="mt-2 text-sm text-[var(--sf-muted)]">{{ __('storefront.shop.empty_message') }}</p>
             </div>
         @else
-            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3">
                 @foreach ($cards as $card)
                     @include('storefront.partials.product-card', ['card' => $card])
                 @endforeach
             </div>
 
-            <div class="mt-10">
+            <div class="mt-12">
                 {{ $products->links() }}
             </div>
         @endif

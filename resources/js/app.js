@@ -13,3 +13,18 @@ if (themeFromDom && validThemes.includes(themeFromDom)) {
         // localStorage may be unavailable
     }
 }
+
+const mobileNavToggle = document.querySelector('[data-sf-nav-toggle]');
+const mobileNavPanel = document.querySelector('[data-sf-nav-panel]');
+
+if (mobileNavToggle && mobileNavPanel) {
+    mobileNavToggle.addEventListener('click', () => {
+        const expanded = mobileNavToggle.getAttribute('aria-expanded') === 'true';
+        mobileNavToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        if (expanded) {
+            mobileNavPanel.setAttribute('hidden', '');
+        } else {
+            mobileNavPanel.removeAttribute('hidden');
+        }
+    });
+}

@@ -93,7 +93,7 @@ final class StorefrontCatalogPresenter
         $images = [];
         foreach ($product->images as $image) {
             $images[] = [
-                'url' => $this->productImageUrlResolver->resolveUrl($image),
+                'url' => $this->productImageUrlResolver->resolveUrl($image, $product),
                 'alt' => $this->productImageUrlResolver->resolveAltText($product, $image),
             ];
         }

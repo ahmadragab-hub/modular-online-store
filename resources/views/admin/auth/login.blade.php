@@ -3,19 +3,42 @@
 @section('title', __('admin.auth.login.title'))
 
 @section('content')
-    <div class="mx-auto max-w-md rounded border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-        <h1 class="mb-4 text-xl font-semibold">{{ __('admin.auth.login.title') }}</h1>
+    @php
+        $demoLoginPrefill = app()->environment(['local', 'testing']);
+    @endphp
+    <div class="admin-card w-full shadow-lg">
+        <h1 class="sf-display mb-2 text-2xl text-[var(--adm-text)]">{{ __('admin.brand') }}</h1>
+        <p class="mb-6 text-sm text-[var(--adm-muted)]">{{ __('admin.auth.login.title') }}</p>
         <form method="post" action="{{ route('admin.login.store') }}" class="space-y-4">
             @csrf
             <div>
-                <label for="email">{{ __('admin.auth.login.email') }}</label>
-                <input id="email" name="email" type="email" value="{{ old('email') }}" required class="mt-1 w-full rounded border px-3 py-2">
+                <label class="text-sm font-medium text-[var(--adm-text)]" for="email">{{ __('admin.auth.login.email') }}</label>
+                <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value="{{ old('email', $demoLoginPrefill ? \Database\Seeders\DemoUsersSeeder::ADMIN_EMAIL : '') }}"
+                    required
+                    class="admin-input mt-1"
+                >
             </div>
             <div>
-                <label for="password">{{ __('admin.auth.login.password') }}</label>
-                <input id="password" name="password" type="password" required class="mt-1 w-full rounded border px-3 py-2">
+                <label class="text-sm font-medium text-[var(--adm-text)]" for="password">{{ __('admin.auth.login.password') }}</label>
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    value="{{ old('password', $demoLoginPrefill ? \Database\Seeders\DemoUsersSeeder::ADMIN_PASSWORD : '') }}"
+                    required
+                    class="admin-input mt-1"
+                >
             </div>
-            <button type="submit" class="rounded bg-zinc-900 px-4 py-2 text-white">{{ __('admin.auth.login.submit') }}</button>
+            <button type="submit" class="sf-btn sf-btn--primary w-full">{{ __('admin.auth.login.submit') }}</button>
         </form>
+
+        @include('shared.partials.demo-login-hints', [
+            'demoLoginEmail' => \Database\Seeders\DemoUsersSeeder::ADMIN_EMAIL,
+            'demoLoginPassword' => \Database\Seeders\DemoUsersSeeder::ADMIN_PASSWORD,
+        ])
     </div>
 @endsection

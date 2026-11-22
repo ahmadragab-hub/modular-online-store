@@ -1,39 +1,8 @@
-<header class="storefront-header border-b border-[var(--sf-border)] bg-[var(--sf-surface)]">
-    <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <div class="flex flex-wrap items-center gap-6">
-            <a href="{{ route('storefront.home') }}" class="text-lg font-semibold text-[var(--sf-text)]">
-                {{ __('storefront.brand') }}
-            </a>
-            <nav class="flex items-center gap-4 text-sm font-medium" aria-label="{{ __('storefront.nav.main') }}">
-                <a href="{{ route('storefront.home') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
-                    {{ __('storefront.nav.home') }}
-                </a>
-                <a href="{{ route('storefront.shop.index') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
-                    {{ __('storefront.nav.shop') }}
-                </a>
-                <a href="{{ route('storefront.cart.show') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
-                    {{ __('storefront.nav.cart') }}
-                </a>
-                @auth
-                    @if (auth()->user()->role === \App\Domains\Identity\Models\User::ROLE_CUSTOMER && auth()->user()->isActive())
-                        <a href="{{ route('storefront.account.index') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
-                            {{ __('storefront.nav.account') }}
-                        </a>
-                    @endif
-                @else
-                    <a href="{{ route('storefront.login.create') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
-                        {{ __('storefront.nav.login') }}
-                    </a>
-                    <a href="{{ route('storefront.register.create') }}" class="text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
-                        {{ __('storefront.nav.register') }}
-                    </a>
-                @endauth
-            </nav>
-        </div>
-
-        <nav class="flex flex-wrap items-center gap-3 text-sm" aria-label="{{ __('storefront.preferences.controls') }}">
-            <div class="flex items-center gap-1 rounded-lg border border-[var(--sf-border)] p-1">
-                <span class="sr-only">{{ __('storefront.preferences.language') }}</span>
+<div class="sf-pref-bar">
+    <div class="sf-container flex flex-wrap items-center justify-between gap-2 py-2">
+        <p class="hidden text-[var(--sf-muted)] sm:block">{{ __('storefront.preferences.controls') }}</p>
+        <nav class="flex flex-wrap items-center gap-2" aria-label="{{ __('storefront.preferences.controls') }}">
+            <div class="sf-pref-bar__group">
                 @foreach ($storefrontLocales as $code => $meta)
                     <form method="POST" action="{{ route('storefront.locale') }}" class="inline">
                         @csrf
@@ -41,7 +10,7 @@
                         <button
                             type="submit"
                             @class([
-                                'rounded-md px-3 py-1.5 font-medium transition',
+                                'rounded px-2.5 py-1 font-medium transition',
                                 'bg-[var(--sf-accent)] text-[var(--sf-accent-text)]' => $storefrontLocale === $code,
                                 'text-[var(--sf-muted)] hover:text-[var(--sf-text)]' => $storefrontLocale !== $code,
                             ])
@@ -52,9 +21,7 @@
                     </form>
                 @endforeach
             </div>
-
-            <div class="flex items-center gap-1 rounded-lg border border-[var(--sf-border)] p-1">
-                <span class="sr-only">{{ __('storefront.preferences.theme') }}</span>
+            <div class="sf-pref-bar__group">
                 @foreach ($storefrontThemes as $code => $meta)
                     @php
                         $themeLabel = $code === 'light'
@@ -67,7 +34,7 @@
                         <button
                             type="submit"
                             @class([
-                                'rounded-md px-3 py-1.5 font-medium transition',
+                                'rounded px-2.5 py-1 font-medium transition',
                                 'bg-[var(--sf-accent)] text-[var(--sf-accent-text)]' => $storefrontTheme === $code,
                                 'text-[var(--sf-muted)] hover:text-[var(--sf-text)]' => $storefrontTheme !== $code,
                             ])
@@ -78,9 +45,7 @@
                     </form>
                 @endforeach
             </div>
-
-            <div class="flex items-center gap-1 rounded-lg border border-[var(--sf-border)] p-1">
-                <span class="sr-only">{{ __('storefront.preferences.currency') }}</span>
+            <div class="sf-pref-bar__group">
                 @foreach ($storefrontDisplayCurrencies as $currency)
                     <form method="POST" action="{{ route('storefront.currency') }}" class="inline">
                         @csrf
@@ -88,28 +53,16 @@
                         <button
                             type="submit"
                             @class([
-                                'rounded-md px-3 py-1.5 font-medium transition',
+                                'rounded px-2.5 py-1 font-medium transition',
                                 'bg-[var(--sf-accent)] text-[var(--sf-accent-text)]' => $storefrontDisplayCurrency === $currency->code,
                                 'text-[var(--sf-muted)] hover:text-[var(--sf-text)]' => $storefrontDisplayCurrency !== $currency->code,
                             ])
-                            aria-current="{{ $storefrontDisplayCurrency === $currency->code ? 'true' : 'false' }}"
                         >
                             {{ $currency->code }}
                         </button>
                     </form>
                 @endforeach
             </div>
-
-            @auth
-                @if (auth()->user()->role === \App\Domains\Identity\Models\User::ROLE_CUSTOMER && auth()->user()->isActive())
-                    <form method="post" action="{{ route('storefront.logout.destroy') }}" class="inline">
-                        @csrf
-                        <button type="submit" class="rounded-md border border-[var(--sf-border)] px-3 py-1.5 font-medium text-[var(--sf-muted)] hover:text-[var(--sf-text)]">
-                            {{ __('storefront.nav.logout') }}
-                        </button>
-                    </form>
-                @endif
-            @endauth
         </nav>
     </div>
-</header>
+</div>

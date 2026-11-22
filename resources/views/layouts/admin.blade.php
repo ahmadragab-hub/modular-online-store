@@ -9,29 +9,34 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
-<body class="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
+<body class="admin-body antialiased">
     @auth
-        @include('admin.partials.nav')
-    @endauth
+        <div class="admin-shell">
+            @include('admin.partials.sidebar')
+            <div class="admin-main w-full max-w-7xl">
+                @if (session('status'))
+                    <p class="admin-card mb-4 border-emerald-300 text-sm text-emerald-800" role="status">
+                        {{ session('status') }}
+                    </p>
+                @endif
 
-    <main class="mx-auto max-w-6xl px-4 py-6">
-        @if (session('status'))
-            <p class="mb-4 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900" role="status">
-                {{ session('status') }}
-            </p>
-        @endif
+                @if ($errors->any())
+                    <div class="admin-card mb-4 border-red-300 text-sm text-red-800" role="alert">
+                        <ul class="list-disc ps-5">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
 
-        @if ($errors->any())
-            <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
-                <ul class="list-disc ps-5">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+                @yield('content')
             </div>
-        @endif
-
-        @yield('content')
-    </main>
+        </div>
+    @else
+        <main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
+            @yield('content')
+        </main>
+    @endauth
 </body>
 </html>

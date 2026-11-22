@@ -74,7 +74,7 @@ class DemoCatalogSeederTest extends TestCase
         $listQuery = $this->app->make(ListPublishedProductsQuery::class);
         $products = $listQuery->paginate('en', 50);
 
-        $this->assertGreaterThanOrEqual(6, $products->total());
+        $this->assertGreaterThanOrEqual(18, $products->total());
 
         $detailQuery = $this->app->make(GetProductBySlugQuery::class);
         $product = $detailQuery->find('classic-oxford-shirt', 'en');

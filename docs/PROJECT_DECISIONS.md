@@ -413,7 +413,7 @@ Consolidated from [ARCHITECTURE.md](ARCHITECTURE.md), [BUSINESS_WORKFLOWS.md](BU
 | UX-004 | Fix broken/unusable UI when touched in a feature | Approved |
 | UX-005 | Comprehensive UI/UX polish milestone before production readiness | Approved |
 
-**UX-005 — Pre-production UI/UX polish**
+**UX-005 — Pre-production UI/UX polish** — **Implemented** 2026-11-19 ([UX_005_IMPLEMENTATION_REPORT.md](UX_005_IMPLEMENTATION_REPORT.md))
 - **Status:** Approved (project owner).
 - **Statement:** A dedicated comprehensive UI/UX polish milestone is planned before production readiness; backend milestones must not substitute for it (**UX-003**).
 - **Date:** 2026-11-16.

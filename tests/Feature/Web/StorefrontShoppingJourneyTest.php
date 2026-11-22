@@ -42,7 +42,7 @@ class StorefrontShoppingJourneyTest extends TestCase
         ['product' => $product, 'variant' => $variantA] = $this->createSellableVariantForCart('60.00', stock: 10, enName: 'Journey Tee');
         ['variant' => $variantB] = $this->createSellableVariantForCart('40.00', stock: 10, enName: 'Journey Cap');
 
-        $this->get(route('storefront.home'))->assertOk()->assertSee(__('storefront.home.view_cart', [], 'en'), false);
+        $this->get(route('storefront.home'))->assertOk()->assertSee(__('storefront.home.browse_shop', [], 'en'), false);
         $this->get(route('storefront.shop.index'))->assertOk()->assertSee('Journey Tee', false);
         $this->get(route('storefront.products.show', ['slug' => $product->slug]))->assertOk()->assertSee('Journey Tee', false);
 

@@ -3,6 +3,7 @@
 return [
     'brand' => 'Administration',
     'nav' => [
+        'main' => 'Admin navigation',
         'dashboard' => 'Dashboard',
         'catalog' => 'Catalog',
         'categories' => 'Categories',

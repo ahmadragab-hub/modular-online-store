@@ -74,6 +74,7 @@ Phased implementation from foundation to production deployment. Adjust dates wit
 
 ## Phase 7 — Storefront and admin UX
 
+- **UX-005 redesign** — **implemented** (2026-11-19): design system, home/shop/PDP/cart/checkout, admin shell ([UX_005_IMPLEMENTATION_REPORT.md](UX_005_IMPLEMENTATION_REPORT.md))
 - Fashion-oriented PLP/PDP, cart, checkout flow (web) — **storefront MVP largely complete**
 - **Milestone 10:** Admin dashboards and CRUD for catalog, orders, inventory, customers, store config ([STORE_ADMINISTRATION_PLAN.md](STORE_ADMINISTRATION_PLAN.md))
 - API parity for mobile/headless clients — deferred

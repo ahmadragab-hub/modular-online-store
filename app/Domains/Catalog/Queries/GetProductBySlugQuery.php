@@ -42,6 +42,7 @@ final class GetProductBySlugQuery
             'images' => static function ($imageQuery): void {
                 $imageQuery->orderBy('sort_order')->orderBy('id');
             },
+            'categories',
         ]);
     }
 }

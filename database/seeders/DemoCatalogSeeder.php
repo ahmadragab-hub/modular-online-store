@@ -34,7 +34,7 @@ class DemoCatalogSeeder extends Seeder
             [
                 'slug' => 'classic-oxford-shirt',
                 'brand' => 'Atelier Line',
-                'price' => '49.00',
+                'price' => '980.00',
                 'skus' => [
                     ['size' => 'M', 'color' => 'white', 'sku' => 'DEMO-OXF-M-WHT', 'stock' => 12],
                     ['size' => 'L', 'color' => 'navy', 'sku' => 'DEMO-OXF-L-NVY', 'stock' => 8],
@@ -54,7 +54,7 @@ class DemoCatalogSeeder extends Seeder
             [
                 'slug' => 'linen-relaxed-trousers',
                 'brand' => 'Atelier Line',
-                'price' => '72.00',
+                'price' => '1440.00',
                 'skus' => [
                     ['size' => 'M', 'color' => 'sand', 'sku' => 'DEMO-LIN-M-SND', 'stock' => 10],
                     ['size' => 'L', 'color' => 'sand', 'sku' => 'DEMO-LIN-L-SND', 'stock' => 6],
@@ -74,7 +74,7 @@ class DemoCatalogSeeder extends Seeder
             [
                 'slug' => 'midi-satin-slip-dress',
                 'brand' => 'Maison Rue',
-                'price' => '98.00',
+                'price' => '1960.00',
                 'skus' => [
                     ['size' => 'S', 'color' => 'black', 'sku' => 'DEMO-SLP-S-BLK', 'stock' => 7],
                     ['size' => 'M', 'color' => 'black', 'sku' => 'DEMO-SLP-M-BLK', 'stock' => 9],
@@ -94,7 +94,7 @@ class DemoCatalogSeeder extends Seeder
             [
                 'slug' => 'wool-blend-overcoat',
                 'brand' => 'Maison Rue',
-                'price' => '165.00',
+                'price' => '3300.00',
                 'skus' => [
                     ['size' => 'L', 'color' => 'camel', 'sku' => 'DEMO-COT-L-CML', 'stock' => 5],
                     ['size' => 'XL', 'color' => 'camel', 'sku' => 'DEMO-COT-XL-CML', 'stock' => 4],
@@ -114,7 +114,7 @@ class DemoCatalogSeeder extends Seeder
             [
                 'slug' => 'merino-rib-knit-sweater',
                 'brand' => 'Atelier Line',
-                'price' => '86.00',
+                'price' => '1720.00',
                 'skus' => [
                     ['size' => 'M', 'color' => 'burgundy', 'sku' => 'DEMO-KNT-M-BRG', 'stock' => 11],
                     ['size' => 'L', 'color' => 'burgundy', 'sku' => 'DEMO-KNT-L-BRG', 'stock' => 8],
@@ -134,7 +134,7 @@ class DemoCatalogSeeder extends Seeder
             [
                 'slug' => 'leather-crossbody-bag',
                 'brand' => 'Maison Rue',
-                'price' => '120.00',
+                'price' => '1200.00',
                 'skus' => [
                     ['size' => 'ONE', 'color' => 'black', 'sku' => 'DEMO-BAG-ONE-BLK', 'stock' => 15],
                 ],
@@ -148,6 +148,243 @@ class DemoCatalogSeeder extends Seeder
                     'name' => 'حقيبة كتف جلدية',
                     'short' => 'حقيبة يومية من جلد دبغ نباتي.',
                     'description' => 'حزام قابل للتعديل وجيب داخلي لحمل الأساسيات بأناقة.',
+                ],
+            ],
+            [
+                'slug' => 'slim-fit-chino',
+                'brand' => 'Atelier Line',
+                'price' => '890.00',
+                'skus' => [
+                    ['size' => 'M', 'color' => 'navy', 'sku' => 'DEMO-CHI-M-NVY', 'stock' => 14],
+                    ['size' => 'L', 'color' => 'sand', 'sku' => 'DEMO-CHI-L-SND', 'stock' => 9],
+                ],
+                'category' => 'menswear-tops',
+                'en' => [
+                    'name' => 'Slim Fit Chino',
+                    'short' => 'Stretch cotton chino with a tapered leg.',
+                    'description' => 'Mid-rise chino in garment-dyed cotton with a clean office-to-weekend profile.',
+                ],
+                'ar' => [
+                    'name' => 'بنطال تشينو بقصة ضيقة',
+                    'short' => 'قطن مريح بقصة مدببة.',
+                    'description' => 'خصر متوسط ونسيج قطني مناسب للعمل والعطلة.',
+                ],
+            ],
+            [
+                'slug' => 'silk-button-blouse',
+                'brand' => 'Maison Rue',
+                'price' => '1450.00',
+                'skus' => [
+                    ['size' => 'S', 'color' => 'white', 'sku' => 'DEMO-BLS-S-WHT', 'stock' => 8],
+                    ['size' => 'M', 'color' => 'burgundy', 'sku' => 'DEMO-BLS-M-BRG', 'stock' => 7],
+                ],
+                'category' => 'womenswear-dresses',
+                'en' => [
+                    'name' => 'Silk Button Blouse',
+                    'short' => 'Fluid silk with mother-of-pearl buttons.',
+                    'description' => 'Lightweight blouse with a relaxed collar and French cuffs.',
+                ],
+                'ar' => [
+                    'name' => 'بلوزة حرير بأزرار',
+                    'short' => 'حرير انسيابي بأزرار أنيقة.',
+                    'description' => 'الياقة مريحة والأكمام الفرنسية لمظهر راقٍ.',
+                ],
+            ],
+            [
+                'slug' => 'denim-trucker-jacket',
+                'brand' => 'Atelier Line',
+                'price' => '1680.00',
+                'skus' => [
+                    ['size' => 'M', 'color' => 'navy', 'sku' => 'DEMO-DEN-M-NVY', 'stock' => 6],
+                    ['size' => 'L', 'color' => 'navy', 'sku' => 'DEMO-DEN-L-NVY', 'stock' => 5],
+                ],
+                'category' => 'outerwear',
+                'en' => [
+                    'name' => 'Denim Trucker Jacket',
+                    'short' => 'Vintage-wash denim with brushed hardware.',
+                    'description' => 'Classic trucker silhouette lined for transitional weather.',
+                ],
+                'ar' => [
+                    'name' => 'جاكيت دنيم كلاسيكي',
+                    'short' => 'دنيم بغسلة عتيقة.',
+                    'description' => 'قصة تراكر تقليدية مع بطانة خفيفة.',
+                ],
+            ],
+            [
+                'slug' => 'cashmere-wrap-scarf',
+                'brand' => 'Maison Rue',
+                'price' => '750.00',
+                'skus' => [
+                    ['size' => 'ONE', 'color' => 'camel', 'sku' => 'DEMO-SCF-ONE-CML', 'stock' => 20],
+                ],
+                'category' => 'accessories',
+                'en' => [
+                    'name' => 'Cashmere Wrap Scarf',
+                    'short' => 'Ultra-soft cashmere in generous length.',
+                    'description' => 'Fringe-free hem for a clean drape over coats and knits.',
+                ],
+                'ar' => [
+                    'name' => 'وشاح كشمير',
+                    'short' => 'كشمير ناعم بطول سخي.',
+                    'description' => 'حواف نظيفة لتنسيق أنيق فوق المعاطف.',
+                ],
+            ],
+            [
+                'slug' => 'pleated-midi-skirt',
+                'brand' => 'Maison Rue',
+                'price' => '1120.00',
+                'skus' => [
+                    ['size' => 'S', 'color' => 'black', 'sku' => 'DEMO-SKT-S-BLK', 'stock' => 9],
+                    ['size' => 'M', 'color' => 'black', 'sku' => 'DEMO-SKT-M-BLK', 'stock' => 11],
+                ],
+                'category' => 'womenswear',
+                'en' => [
+                    'name' => 'Pleated Midi Skirt',
+                    'short' => 'Permanent pleats with a satin sheen.',
+                    'description' => 'Elastic waistband and midi length for day-to-night styling.',
+                ],
+                'ar' => [
+                    'name' => 'تنورة متوسطة بطيات',
+                    'short' => 'بطيات دائمة بلمعان ساتان.',
+                    'description' => 'خصر مرن وطول متوسط للتنسيق اليومي والمسائي.',
+                ],
+            ],
+            [
+                'slug' => 'court-leather-sneaker',
+                'brand' => 'Atelier Line',
+                'price' => '2200.00',
+                'skus' => [
+                    ['size' => 'M', 'color' => 'white', 'sku' => 'DEMO-SNK-M-WHT', 'stock' => 12],
+                    ['size' => 'L', 'color' => 'white', 'sku' => 'DEMO-SNK-L-WHT', 'stock' => 10],
+                ],
+                'category' => 'accessories',
+                'en' => [
+                    'name' => 'Court Leather Sneaker',
+                    'short' => 'Low-profile cupsole in full-grain leather.',
+                    'description' => 'Minimal court sneaker with contrast heel tab and cushioned insole.',
+                ],
+                'ar' => [
+                    'name' => 'حذاء رياضي جلدي',
+                    'short' => 'نعل منخفض من الجلد الكامل.',
+                    'description' => 'تصميم بسيط مع لسان خلفي مميز ووسادة داخلية مريحة.',
+                ],
+            ],
+            [
+                'slug' => 'structured-wool-blazer',
+                'brand' => 'Atelier Line',
+                'price' => '2890.00',
+                'skus' => [
+                    ['size' => 'M', 'color' => 'navy', 'sku' => 'DEMO-BLZ-M-NVY', 'stock' => 5],
+                    ['size' => 'L', 'color' => 'navy', 'sku' => 'DEMO-BLZ-L-NVY', 'stock' => 4],
+                ],
+                'category' => 'menswear',
+                'en' => [
+                    'name' => 'Structured Wool Blazer',
+                    'short' => 'Half-canvas construction in tropical wool.',
+                    'description' => 'Notch lapel blazer with horn buttons and double vent.',
+                ],
+                'ar' => [
+                    'name' => 'بليزر صوف منظم',
+                    'short' => 'تفصيل نصف كانفس من صوف خفيف.',
+                    'description' => 'ياقة بحرف V وأزرار قرن وفتحة خلفية مزدوجة.',
+                ],
+            ],
+            [
+                'slug' => 'organic-cotton-tee-duo',
+                'brand' => 'Atelier Line',
+                'price' => '420.00',
+                'skus' => [
+                    ['size' => 'M', 'color' => 'white', 'sku' => 'DEMO-TEE-M-WHT', 'stock' => 25],
+                    ['size' => 'L', 'color' => 'sand', 'sku' => 'DEMO-TEE-L-SND', 'stock' => 22],
+                ],
+                'category' => 'menswear-tops',
+                'en' => [
+                    'name' => 'Organic Cotton Tee Duo',
+                    'short' => 'Two-pack crew necks in breathable cotton.',
+                    'description' => 'Ribbed collar and pre-washed hand feel for everyday layering.',
+                ],
+                'ar' => [
+                    'name' => 'تيشيرت قطن عضوي - ثنائي',
+                    'short' => 'حزمة من قطن ناعم.',
+                    'description' => 'ياقة محبوكة وملمس مريح للطبقات اليومية.',
+                ],
+            ],
+            [
+                'slug' => 'satin-wrap-dress',
+                'brand' => 'Maison Rue',
+                'price' => '1980.00',
+                'skus' => [
+                    ['size' => 'S', 'color' => 'burgundy', 'sku' => 'DEMO-WRP-S-BRG', 'stock' => 6],
+                    ['size' => 'M', 'color' => 'burgundy', 'sku' => 'DEMO-WRP-M-BRG', 'stock' => 7],
+                ],
+                'category' => 'womenswear-dresses',
+                'en' => [
+                    'name' => 'Satin Wrap Dress',
+                    'short' => 'Wrap closure with tie waist.',
+                    'description' => 'Midi satin dress with flutter sleeve and deep V neckline.',
+                ],
+                'ar' => [
+                    'name' => 'فستان ساتان ملفوف',
+                    'short' => 'إغلاق ملفوف مع حزام.',
+                    'description' => 'أكمام منسدلة وخط رقبة عميق بطول متوسط.',
+                ],
+            ],
+            [
+                'slug' => 'merino-beanie',
+                'brand' => 'Atelier Line',
+                'price' => '380.00',
+                'skus' => [
+                    ['size' => 'ONE', 'color' => 'camel', 'sku' => 'DEMO-BEN-ONE-CML', 'stock' => 30],
+                ],
+                'category' => 'accessories',
+                'en' => [
+                    'name' => 'Merino Beanie',
+                    'short' => 'Fine-gauge knit beanie.',
+                    'description' => 'Double-layer cuff in soft merino for crisp weather.',
+                ],
+                'ar' => [
+                    'name' => 'قبعة ميرينو',
+                    'short' => 'حياكة رفيعة ناعمة.',
+                    'description' => 'حاشية مزدوجة من الميرينو للطقس البارد.',
+                ],
+            ],
+            [
+                'slug' => 'tailored-linen-shorts',
+                'brand' => 'Atelier Line',
+                'price' => '680.00',
+                'skus' => [
+                    ['size' => 'M', 'color' => 'sand', 'sku' => 'DEMO-SHT-M-SND', 'stock' => 13],
+                    ['size' => 'L', 'color' => 'sand', 'sku' => 'DEMO-SHT-L-SND', 'stock' => 11],
+                ],
+                'category' => 'menswear',
+                'en' => [
+                    'name' => 'Tailored Linen Shorts',
+                    'short' => 'Pressed crease with side adjusters.',
+                    'description' => 'Breathable linen shorts with lined pockets and mid-thigh length.',
+                ],
+                'ar' => [
+                    'name' => 'شورت كتان أنيق',
+                    'short' => 'طية أمامية وجيوب مبطنة.',
+                    'description' => 'كتان منعش بطول فخذ متوسط للصيف.',
+                ],
+            ],
+            [
+                'slug' => 'canvas-market-tote',
+                'brand' => 'Maison Rue',
+                'price' => '520.00',
+                'skus' => [
+                    ['size' => 'ONE', 'color' => 'sand', 'sku' => 'DEMO-TOT-ONE-SND', 'stock' => 18],
+                ],
+                'category' => 'accessories',
+                'en' => [
+                    'name' => 'Canvas Market Tote',
+                    'short' => 'Heavy canvas with leather handles.',
+                    'description' => 'Roomy tote with interior zip pocket and reinforced base.',
+                ],
+                'ar' => [
+                    'name' => 'حقيبة كانفاس',
+                    'short' => 'كانفاس سميك بمقابض جلدية.',
+                    'description' => 'جيب داخلي بسحاب وقاعدة معززة.',
                 ],
             ],
         ];
@@ -217,17 +454,26 @@ class DemoCatalogSeeder extends Seeder
     private function seedCategories(): array
     {
         $rows = [
-            ['slug' => 'demo-menswear', 'name' => 'Menswear', 'key' => 'menswear'],
-            ['slug' => 'demo-womenswear', 'name' => 'Womenswear', 'key' => 'womenswear'],
-            ['slug' => 'demo-outerwear', 'name' => 'Outerwear', 'key' => 'outerwear'],
-            ['slug' => 'demo-accessories', 'name' => 'Accessories', 'key' => 'accessories'],
+            ['slug' => 'demo-menswear', 'name' => 'Menswear', 'key' => 'menswear', 'parent' => null],
+            ['slug' => 'demo-womenswear', 'name' => 'Womenswear', 'key' => 'womenswear', 'parent' => null],
+            ['slug' => 'demo-outerwear', 'name' => 'Outerwear', 'key' => 'outerwear', 'parent' => null],
+            ['slug' => 'demo-accessories', 'name' => 'Accessories', 'key' => 'accessories', 'parent' => null],
+            ['slug' => 'demo-menswear-tops', 'name' => 'Tops & Shirts', 'key' => 'menswear-tops', 'parent' => 'demo-menswear'],
+            ['slug' => 'demo-womenswear-dresses', 'name' => 'Dresses & Blouses', 'key' => 'womenswear-dresses', 'parent' => 'demo-womenswear'],
         ];
 
         $categories = [];
         foreach ($rows as $row) {
+            $parentId = null;
+            if ($row['parent'] !== null) {
+                $parent = Category::query()->where('slug', $row['parent'])->first();
+                $parentId = $parent?->getKey();
+            }
+
             Category::query()->updateOrCreate(
                 ['slug' => $row['slug']],
                 [
+                    'parent_id' => $parentId,
                     'name' => $row['name'],
                     'description' => null,
                     'sort_order' => 0,

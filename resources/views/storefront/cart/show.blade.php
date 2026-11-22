@@ -3,30 +3,14 @@
 @section('title', __('storefront.cart.title'))
 
 @section('content')
-    <main class="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-        <h1 class="text-3xl font-semibold text-[var(--sf-text)]">{{ __('storefront.cart.title') }}</h1>
-
-        @if (session('cart_status'))
-            <p class="mt-4 rounded-lg border border-[var(--sf-border)] bg-[var(--sf-surface)] px-4 py-3 text-sm text-[var(--sf-text)]" role="status">
-                {{ session('cart_status') }}
-            </p>
-        @endif
-
-        @if ($errors->any())
-            <div class="mt-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200" role="alert">
-                <ul class="list-disc ps-5">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
+    <main class="sf-container max-w-4xl py-10 sm:py-12">
+        <h1 class="sf-display text-3xl text-[var(--sf-text)]">{{ __('storefront.cart.title') }}</h1>
 
         @if ($presentation['lines'] === [])
-            <div class="mt-10 rounded-xl border border-[var(--sf-border)] bg-[var(--sf-surface)] p-10 text-center">
+            <div class="sf-card mt-10 p-10 text-center">
                 <h2 class="text-lg font-semibold text-[var(--sf-text)]">{{ __('storefront.cart.empty_title') }}</h2>
                 <p class="mt-2 text-[var(--sf-muted)]">{{ __('storefront.cart.empty_message') }}</p>
-                <a href="{{ route('storefront.shop.index') }}" class="mt-6 inline-block rounded-lg bg-[var(--sf-accent)] px-5 py-2.5 text-sm font-medium text-[var(--sf-accent-text)]">
+                <a href="{{ route('storefront.shop.index') }}" class="sf-btn sf-btn--primary mt-6">
                     {{ __('storefront.cart.continue_shopping') }}
                 </a>
             </div>
@@ -98,10 +82,10 @@
                         <span class="ms-2">{{ $presentation['display_currency_symbol'] }}{{ $presentation['subtotal_display'] }}</span>
                     </p>
                     <div class="flex flex-wrap gap-3">
-                        <a href="{{ route('storefront.shop.index') }}" class="rounded-lg border border-[var(--sf-border)] px-5 py-2.5 text-sm font-medium text-[var(--sf-text)]">
+                        <a href="{{ route('storefront.shop.index') }}" class="sf-btn sf-btn--secondary">
                             {{ __('storefront.cart.continue_shopping') }}
                         </a>
-                        <a href="{{ route('storefront.checkout.show') }}" class="rounded-lg bg-[var(--sf-accent)] px-5 py-2.5 text-sm font-medium text-[var(--sf-accent-text)]">
+                        <a href="{{ route('storefront.checkout.show') }}" class="sf-btn sf-btn--primary">
                             {{ __('storefront.cart.checkout') }}
                         </a>
                     </div>

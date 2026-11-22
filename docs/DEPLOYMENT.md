@@ -96,6 +96,17 @@ Migration `2026_11_18_120000_enforce_one_active_cart_per_customer_mysql.php`:
 - **Application** must never use SQLite locally; `phpunit.xml` forces SQLite **only** for the default PHPUnit run.
 - Keep **`modular_store_test`** separate for `phpunit.mysql.xml` (RefreshDatabase wipes it).
 
+### Demo dataset (local exploration)
+
+After migrations on MySQL:
+
+```powershell
+php artisan storage:link
+php artisan db:seed --class=DemoStoreSeeder
+```
+
+Idempotent — safe to re-run. Credentials and scenarios: [DEMO_DATA_AND_LOCAL_VERIFICATION_REPORT.md](DEMO_DATA_AND_LOCAL_VERIFICATION_REPORT.md).
+
 ## Local / CI verification (PowerShell)
 
 **Default suite (SQLite):**

@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Domains\Catalog;
 
+use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductImage;
 use App\Domains\Catalog\Models\ProductTranslation;
@@ -73,6 +74,25 @@ class ProductImageUrlResolverTest extends TestCase
         $image = new ProductImage(['alt_text' => '  Custom alt  ']);
 
         $this->assertSame('Custom alt', $this->resolver->resolveAltText($product, $image));
+    }
+
+    public function test_generic_placeholder_maps_to_category_asset(): void
+    {
+        Storage::disk('public')->put('demo/catalog/placeholder.svg', 'x');
+        Storage::disk('public')->put('demo/catalog/placeholder-mens.svg', 'x');
+
+        $product = new Product;
+        $product->setRelation('categories', new Collection([
+            new Category(['slug' => 'demo-menswear']),
+        ]));
+
+        $image = new ProductImage([
+            'disk' => 'public',
+            'path' => 'demo/catalog/placeholder.svg',
+        ]);
+
+        $expected = Storage::disk('public')->url('demo/catalog/placeholder-mens.svg');
+        $this->assertSame($expected, $this->resolver->resolveUrl($image, $product));
     }
 
     public function test_alt_text_does_not_fall_back_to_base_product_name(): void

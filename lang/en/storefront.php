@@ -8,10 +8,20 @@ return [
         'home' => 'Home',
         'shop' => 'Shop',
         'cart' => 'Cart',
+        'search' => 'Search',
+        'menu' => 'Menu',
         'login' => 'Sign in',
         'register' => 'Register',
         'account' => 'My account',
         'logout' => 'Sign out',
+    ],
+    'footer' => [
+        'about' => 'Curated contemporary fashion with timeless silhouettes, crafted for everyday elegance.',
+        'shop' => 'Shop',
+        'shop_links' => 'Shopping links',
+        'account' => 'Account',
+        'account_links' => 'Account links',
+        'rights' => 'All rights reserved.',
     ],
     'preferences' => [
         'controls' => 'Store preferences',
@@ -24,8 +34,16 @@ return [
     'home' => [
         'title' => 'Welcome',
         'intro' => 'Browse the collection, manage your cart, and check out as a guest in English or Arabic.',
-        'browse_shop' => 'Browse the shop',
+        'hero_title' => 'Elevated essentials for the modern wardrobe',
+        'hero_intro' => 'Discover refined menswear, womenswear, and accessories in English or Arabic—with checkout in EGP or USD.',
+        'browse_shop' => 'Shop the collection',
         'view_cart' => 'View your cart',
+        'new_arrivals' => 'New arrivals',
+        'categories_title' => 'Shop by category',
+        'featured_title' => 'Featured pieces',
+        'featured_intro' => 'A curated edit of silhouettes, textures, and tones from our latest drop.',
+        'shop_all' => 'View all',
+        'explore_category' => 'Explore',
     ],
     'shop' => [
         'title' => 'Shop',
@@ -142,6 +160,12 @@ return [
         'mock_failure' => 'Simulate failed payment',
     ],
     'auth' => [
+        'demo' => [
+            'hints_label' => 'Local demo login credentials',
+            'hints_title' => 'Local demo',
+            'username' => 'Demo Username',
+            'password' => 'Demo Password',
+        ],
         'login' => [
             'title' => 'Sign in',
             'intro' => 'Access your customer account to continue shopping.',
